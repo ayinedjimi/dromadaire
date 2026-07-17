@@ -1,0 +1,514 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "katex/dist/katex.min.css";
+
+/* Dromadaire: class-based dark mode instead of prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Anti-FOUC: suppress transitions during theme swap */
+.disable-transitions *,
+.disable-transitions *::before,
+.disable-transitions *::after {
+  transition: none !important;
+}
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-rounded:
+    "SF Pro Rounded", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+
+/* =================================================================
+   Dromadaire v3: HSL-based design tokens
+   Usage: hsl(var(--bg-000)) or hsl(var(--bg-000) / 50%)
+   ================================================================= */
+
+:root, .light {
+  /* Backgrounds (000 = primary surface → 400 = deepest layer) */
+  --bg-000: 0 0% 100%;
+  --bg-100: 0 0% 96%;
+  --bg-200: 0 0% 93%;
+  --bg-300: 0 0% 90%;
+  --bg-400: 0 0% 86%;
+
+  /* Text (000 = strongest → 400 = most muted) */
+  --text-000: 0 0% 10%;
+  --text-100: 0 0% 20%;
+  --text-200: 0 0% 35%;
+  --text-300: 0 0% 45%;
+  --text-400: 0 0% 60%;
+
+  /* Borders */
+  --border-100: 0 0% 90%;
+  --border-200: 0 0% 80%;
+  --border-300: 0 0% 70%;
+
+  /* Accent (Dromadaire sand/clay) */
+  --accent-000: 30 60% 45%;
+  --accent-100: 30 60% 55%;
+  --accent-200: 30 65% 65%;
+  --accent-900: 30 30% 90%;
+
+  /* Danger */
+  --danger-100: 0 56% 55%;
+  --danger-200: 0 56% 45%;
+
+  /* Success */
+  --success-100: 103 72% 35%;
+  --success-200: 103 72% 27%;
+
+  /* On-color (text on colored backgrounds) */
+  --oncolor-100: 0 0% 100%;
+  --oncolor-200: 0 0% 90%;
+
+  /* Retro-compat aliases (LOT 19 legacy) */
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+.dark {
+  --bg-000: 0 0% 10%;
+  --bg-100: 0 0% 15%;
+  --bg-200: 0 0% 12%;
+  --bg-300: 0 0% 8%;
+  --bg-400: 0 0% 0%;
+  --text-000: 0 0% 96%;
+  --text-100: 0 0% 90%;
+  --text-200: 0 0% 75%;
+  --text-300: 0 0% 64%;
+  --text-400: 0 0% 50%;
+  --border-100: 0 0% 25%;
+  --border-200: 0 0% 35%;
+  --border-300: 0 0% 45%;
+  --accent-000: 30 60% 55%;
+  --accent-100: 30 60% 65%;
+  --accent-200: 30 65% 75%;
+  --accent-900: 30 30% 20%;
+  --danger-100: 0 56% 60%;
+  --danger-200: 0 56% 50%;
+  --success-100: 103 60% 45%;
+  --success-200: 103 60% 35%;
+  --oncolor-100: 0 0% 100%;
+  --oncolor-200: 0 0% 90%;
+
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+.oled {
+  --bg-000: 0 0% 0%;
+  --bg-100: 0 0% 4%;
+  --bg-200: 0 0% 7%;
+  --bg-300: 0 0% 5%;
+  --bg-400: 0 0% 0%;
+  --text-000: 0 0% 100%;
+  --text-100: 0 0% 90%;
+  --text-200: 0 0% 75%;
+  --text-300: 0 0% 64%;
+  --text-400: 0 0% 50%;
+  --border-100: 0 0% 15%;
+  --border-200: 0 0% 25%;
+  --border-300: 0 0% 35%;
+
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+.sepia {
+  --bg-000: 40 47% 90%;
+  --bg-100: 40 42% 86%;
+  --bg-200: 40 38% 82%;
+  --bg-300: 40 35% 78%;
+  --bg-400: 40 30% 74%;
+  --text-000: 24 21% 28%;
+  --text-100: 24 18% 38%;
+  --text-200: 30 17% 44%;
+  --text-300: 30 14% 52%;
+  --text-400: 30 12% 62%;
+  --border-100: 36 25% 75%;
+  --border-200: 36 20% 65%;
+  --border-300: 36 15% 55%;
+
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+.blue-night {
+  --bg-000: 215 21% 7%;
+  --bg-100: 215 19% 11%;
+  --bg-200: 215 17% 14%;
+  --bg-300: 215 15% 9%;
+  --bg-400: 215 21% 4%;
+  --text-000: 210 29% 93%;
+  --text-100: 210 25% 85%;
+  --text-200: 210 12% 65%;
+  --text-300: 210 10% 57%;
+  --text-400: 210 8% 45%;
+  --border-100: 215 14% 21%;
+  --border-200: 215 12% 30%;
+  --border-300: 215 10% 40%;
+
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+.nord {
+  --bg-000: 220 16% 22%;
+  --bg-100: 222 16% 28%;
+  --bg-200: 220 17% 25%;
+  --bg-300: 220 16% 20%;
+  --bg-400: 220 16% 16%;
+  --text-000: 218 27% 94%;
+  --text-100: 219 28% 88%;
+  --text-200: 218 18% 75%;
+  --text-300: 219 15% 65%;
+  --text-400: 219 12% 55%;
+  --border-100: 220 17% 32%;
+  --border-200: 220 14% 40%;
+  --border-300: 220 12% 48%;
+
+  --bg-primary: hsl(var(--bg-000));
+  --bg-secondary: hsl(var(--bg-100));
+  --text-primary: hsl(var(--text-000));
+  --text-secondary: hsl(var(--text-300));
+  --border-color: hsl(var(--border-100));
+}
+
+/* messaging-style typing indicator animation */
+@keyframes typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+/* LOT D1: Mobile bottom sheet slide-up animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Model loading shimmer animation (indeterminate progress) */
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ===== Micro-animations — Dromadaire v6 ===== */
+
+/* 1. Message enter: fade-in + subtle slide-up */
+@keyframes msg-enter {
+  from { opacity: 0; transform: translateY(6px); }
+}
+.animate-msg-enter { animation: msg-enter 0.3s ease-out; }
+
+/* 2. Streaming cursor blink */
+@keyframes blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.streaming-caret {
+  display: inline-block;
+  width: 3px;
+  height: 1.1em;
+  background: hsl(var(--accent-000));
+  border-radius: 1px;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink-caret 1s step-end infinite;
+}
+
+/* 3. Message actions slide-in */
+.msg-actions-container {
+  opacity: 0;
+  transform: translateX(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+.group:hover .msg-actions-container,
+.msg-actions-container:focus-within {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 4. Theme crossfade */
+html, body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* 5. Textarea focus glow */
+@keyframes focus-glow {
+  from { box-shadow: 0 0 0 3px hsl(var(--accent-000) / 25%); }
+  to { box-shadow: 0 0 0 3px transparent; }
+}
+.textarea-focus-glow:focus-within {
+  border-color: hsl(var(--accent-100)) !important;
+  animation: focus-glow 0.6s ease-out;
+}
+
+/* 6. Empty state card stagger */
+@keyframes card-enter {
+  from { opacity: 0; transform: scale(0.96) translateY(4px); }
+}
+.animate-card-enter {
+  animation: card-enter 0.35s ease-out both;
+}
+
+/* 7. Checkmark SVG draw */
+@keyframes draw-check {
+  from { stroke-dashoffset: 16; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 8. Sidebar active indicator */
+.sidebar-active-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 2px 2px 0;
+  background: hsl(var(--accent-000));
+  transition: top 0.2s ease-out, height 0.2s ease-out;
+}
+
+/* 9. Scroll-to-bottom floating button */
+@keyframes fade-scale-in {
+  from { opacity: 0; transform: scale(0.85) translateY(4px); }
+}
+.animate-scroll-btn {
+  animation: fade-scale-in 0.2s ease-out;
+}
+
+/* 10. Code block shimmer (Shiki loading) */
+.code-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 25%, hsl(var(--bg-200) / 40%) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Fix: missing animate-fade-in for ChatForm edit mode */
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+
+/* ===== 11. Modal backdrop + content enter ===== */
+@keyframes backdrop-fade {
+  from { opacity: 0; }
+}
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.95) translateY(-8px); }
+}
+.animate-backdrop { animation: backdrop-fade 0.15s ease-out; }
+.animate-modal-enter { animation: modal-enter 0.2s ease-out; }
+
+/* 12. Button press micro-feedback */
+.btn-press {
+  transition: transform 0.1s ease-out;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+.btn-press-sm:active {
+  transform: scale(0.95);
+}
+
+/* 13. Sidebar chat item enter (staggered via style --i) */
+@keyframes sidebar-item-enter {
+  from { opacity: 0; transform: translateX(-8px); }
+}
+.animate-sidebar-item {
+  animation: sidebar-item-enter 0.2s ease-out both;
+  animation-delay: calc(var(--i, 0) * 25ms);
+}
+
+/* 14. Notification slide-in from bottom */
+@keyframes notif-enter {
+  from { opacity: 0; transform: translateY(12px); }
+}
+.animate-notif { animation: notif-enter 0.25s ease-out; }
+
+/* 15. Tooltip/popover scale-in */
+@keyframes popover-enter {
+  from { opacity: 0; transform: scale(0.92); }
+}
+.animate-popover { animation: popover-enter 0.15s ease-out; }
+
+/* 16. Smooth height collapse/expand */
+.collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.25s ease-out;
+}
+.collapsible.collapsed {
+  grid-template-rows: 0fr;
+}
+.collapsible > * {
+  overflow: hidden;
+}
+
+/* ===== Accessibility: respect reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Streaming cursor: no blink, keep visible */
+  .streaming-caret {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ===== LM Studio-inspired sidebar styles ===== */
+
+.sidebar-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--text-300));
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+.sidebar-icon-btn:hover {
+  background: hsl(var(--bg-200));
+  color: hsl(var(--text-000));
+}
+
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: hsl(var(--bg-200));
+  transition: background 150ms;
+}
+.sidebar-search:focus-within {
+  background: hsl(var(--bg-300));
+}
+.sidebar-search-icon {
+  flex-shrink: 0;
+  color: hsl(var(--text-400));
+}
+.sidebar-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 12px;
+  color: hsl(var(--text-000));
+  min-width: 0;
+}
+.sidebar-search-input::placeholder {
+  color: hsl(var(--text-400));
+}
+.sidebar-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: hsl(var(--bg-300));
+  color: hsl(var(--text-300));
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sidebar-search-clear:hover {
+  background: hsl(var(--bg-400));
+  color: hsl(var(--text-000));
+}
+
+.sidebar-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: hsl(var(--text-200));
+  transition: background 120ms, color 120ms;
+}
+.sidebar-nav-link:hover {
+  background: hsl(var(--bg-200));
+  color: hsl(var(--text-000));
+}
+.sidebar-nav-active {
+  background: hsl(var(--bg-200));
+  color: hsl(var(--text-000));
+  font-weight: 500;
+}
+
+/* "..." dots button on chat items — hidden by default, shown on hover */
+.sidebar-dots-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--text-400));
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms, background 120ms, color 120ms;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.allow-context-menu:hover .sidebar-dots-btn {
+  opacity: 1;
+}
+.sidebar-dots-btn:hover {
+  background: hsl(var(--bg-300));
+  color: hsl(var(--text-000));
+}
+
+/* ===== LM Studio-inspired rounded window frame ===== */
+.app-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.06), 0 8px 24px hsl(0 0% 0% / 0.08);
+}
