@@ -25,12 +25,13 @@ import {
   Terminal,
   Cpu,
   Warning,
+  ShareNetwork,
 } from "@phosphor-icons/react";
 import { Settings as SettingsType } from "@/gotypes";
 import { useNavigate } from "@tanstack/react-router";
 import { useUser } from "@/hooks/useUser";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getSettings, updateSettings, getEncryptionKey, authStatus, setAppPassword, removeAppPassword, getHardwareInfo, runAutoconfig, restartServer, analyzeWritingStyle } from "@/api";
+import { getSettings, updateSettings, getEncryptionKey, authStatus, setAppPassword, removeAppPassword, getHardwareInfo, runAutoconfig, restartServer, analyzeWritingStyle, getExternalServerStatus, setExternalServer } from "@/api";
 import type { HardwareInfo } from "@/api";
 
 export default function Settings() {
@@ -1108,6 +1109,9 @@ export default function Settings() {
           {/* LOT H: Writing style analysis for human mode */}
           <StyleAnalysisSection settings={settings} handleChange={handleChange} />
 
+          {/* Dromadaire: external Ollama server for third-party apps */}
+          <ExternalServerSection />
+
           {/* LOTs 15-21: Features settings */}
           <div className="px-4 pt-4">
             <h3 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Fonctionnalites</h3>
@@ -1377,6 +1381,46 @@ function StyleAnalysisSection({ settings, handleChange }: { settings: any; handl
             </div>
           </Field>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ExternalServerSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["external-server"],
+    queryFn: getExternalServerStatus,
+    refetchInterval: 5000,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: setExternalServer,
+    onSuccess: (status) => queryClient.setQueryData(["external-server"], status),
+  });
+
+  return (
+    <div className="px-4 pt-4">
+      <h3 className="mb-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100">Accès externe</h3>
+      <div className="space-y-4">
+        <Field>
+          <div className="flex items-center justify-between">
+            <div className="flex items-start space-x-3">
+              <ShareNetwork size={20} className="mt-1 flex-shrink-0 text-black dark:text-neutral-100" />
+              <div>
+                <Label>Serveur Ollama externe (port {data?.port ?? "11434"})</Label>
+                <Description>
+                  Lance une instance Ollama séparée sur le port standard pour qu'une application tierce (LM Studio, scripts, SDK Ollama...) utilise tes modèles. N'inclut pas le RAG ni les agents Dromadaire.
+                </Description>
+              </div>
+            </div>
+            <Switch
+              checked={data?.running ?? false}
+              disabled={isLoading || toggleMutation.isPending}
+              onChange={(checked) => toggleMutation.mutate(checked)}
+            />
+          </div>
+        </Field>
       </div>
     </div>
   );

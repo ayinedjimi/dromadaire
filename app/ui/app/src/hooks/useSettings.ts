@@ -38,6 +38,7 @@ interface SettingsState {
 type SettingsUpdate = Partial<{
   TurboEnabled: boolean;
   WebSearchEnabled: boolean;
+  Agent: boolean;
   ThinkEnabled: boolean;
   ThinkLevel: string;
   SelectedModel: string;

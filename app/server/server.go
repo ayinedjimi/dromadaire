@@ -34,6 +34,62 @@ type Server struct {
 	dev       bool   // true if running with the dev flag
 	port      string // Dromadaire: dynamically allocated port for the internal server
 	restartCh chan struct{}
+
+	// Dromadaire: separate, opt-in ollama server bound to the standard port
+	// (11434) so third-party Ollama-compatible apps can reuse the same
+	// models. Fully independent from the internal server above.
+	externalMu  sync.Mutex
+	externalCmd *exec.Cmd
+}
+
+// ExternalServerPort is the standard Ollama port third-party apps expect.
+const ExternalServerPort = "11434"
+
+// ExternalServerRunning reports whether the external-access server is active.
+func (s *Server) ExternalServerRunning() bool {
+	s.externalMu.Lock()
+	defer s.externalMu.Unlock()
+	return s.externalCmd != nil && s.externalCmd.ProcessState == nil
+}
+
+// StartExternalServer launches a separate `ollama serve` process bound to
+// the standard port (11434) so other Ollama-compatible apps can connect
+// using the shared model files, independent of the app's own internal server.
+func (s *Server) StartExternalServer() error {
+	s.externalMu.Lock()
+	defer s.externalMu.Unlock()
+
+	if s.externalCmd != nil && s.externalCmd.ProcessState == nil {
+		return nil // already running
+	}
+
+	cmd := commandContext(context.Background(), s.bin, "serve")
+	env := os.Environ()
+	env = append(env, "OLLAMA_HOST=127.0.0.1:"+ExternalServerPort)
+	cmd.Env = env
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start external ollama server: %w", err)
+	}
+	s.externalCmd = cmd
+	go cmd.Wait() // reap the process without blocking
+
+	slog.Info("Dromadaire: external ollama server started", "port", ExternalServerPort)
+	return nil
+}
+
+// StopExternalServer terminates the external-access server, if running.
+func (s *Server) StopExternalServer() error {
+	s.externalMu.Lock()
+	defer s.externalMu.Unlock()
+
+	if s.externalCmd == nil || s.externalCmd.Process == nil {
+		return nil
+	}
+	err := stop(s.externalCmd.Process)
+	s.externalCmd = nil
+	slog.Info("Dromadaire: external ollama server stopped")
+	return err
 }
 
 type InferenceCompute struct {

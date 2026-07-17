@@ -6,7 +6,7 @@ import { getChat, pinChat, setChatFolder } from "@/api";
 import { Link } from "@/components/ui/link";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatsResponse } from "@/gotypes";
-import { GearSix, Trash, Check, X, Info, BookOpen, Lock, EyeSlash, Star, FolderSimple, MagnifyingGlass, DotsThree, Package } from "@phosphor-icons/react";
+import { GearSix, Trash, Check, X, Info, BookOpen, Lock, EyeSlash, Star, FolderSimple, MagnifyingGlass, DotsThree, Package, Robot } from "@phosphor-icons/react";
 import { useSettings } from "@/hooks/useSettings";
 import { useFolder } from "@/contexts/FolderContext";
 import { exportConversation } from "@/lib/export";
@@ -537,6 +537,18 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
                 >
                   <BookOpen size={16} />
                   <span className="truncate">Connaissances</span>
+                </Link>
+              )}
+              {isWindows && (
+                <Link
+                  href="/agents"
+                  activeOptions={{ exact: true }}
+                  activeProps={{ className: "sidebar-nav-active" }}
+                  className="sidebar-nav-link"
+                  draggable={false}
+                >
+                  <Robot size={16} />
+                  <span className="truncate">Agents</span>
                 </Link>
               )}
               {isWindows && (

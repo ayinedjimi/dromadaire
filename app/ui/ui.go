@@ -366,6 +366,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/v1/settings", handle(s.settings))
 	mux.Handle("GET /api/v1/cloud", handle(s.getCloudSetting))
 	mux.Handle("POST /api/v1/cloud", handle(s.cloudSetting))
+	mux.Handle("GET /api/v1/external-server", handle(s.externalServerStatus))
+	mux.Handle("POST /api/v1/external-server", handle(s.setExternalServer))
 	mux.Handle("GET /api/v1/encryption-key", handle(s.getEncryptionKey))
 
 	// Dromadaire: advanced performance endpoints
@@ -2202,6 +2204,42 @@ func (s *Server) writeCloudStatus(w http.ResponseWriter) error {
 	})
 }
 
+// externalServerStatus reports whether the standalone, port-11434 ollama
+// server (for third-party Ollama-compatible apps) is currently running.
+func (s *Server) externalServerStatus(w http.ResponseWriter, r *http.Request) error {
+	running := s.OllamaServer != nil && s.OllamaServer.ExternalServerRunning()
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]any{
+		"running": running,
+		"port":    server.ExternalServerPort,
+	})
+}
+
+// setExternalServer starts or stops the standalone external-access server.
+func (s *Server) setExternalServer(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return fmt.Errorf("invalid request body: %w", err)
+	}
+	if s.OllamaServer == nil {
+		return fmt.Errorf("ollama server not available")
+	}
+
+	if req.Enabled {
+		if err := s.OllamaServer.StartExternalServer(); err != nil {
+			return err
+		}
+	} else {
+		if err := s.OllamaServer.StopExternalServer(); err != nil {
+			return err
+		}
+	}
+
+	return s.externalServerStatus(w, r)
+}
+
 func (s *Server) getInferenceCompute(w http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), 500*time.Millisecond)
 	defer cancel()
@@ -2372,7 +2410,10 @@ func supportsWebSearchTools(model string) bool {
 func (s *Server) buildChatRequest(chat *store.Chat, modelName string, think any, availableTools []map[string]any, frontendReq *responses.ChatRequest) (*api.ChatRequest, []store.RAGSource, error) {
 	var msgs []api.Message
 
-	// Custom system prompt (empty = default)
+	// Custom system prompt (empty = default). Ollama's explicit "system"
+	// message replaces (not merges with) a model's baked-in Modelfile SYSTEM
+	// prompt — for a custom model with its own persona, set a system prompt
+	// here (e.g. via the Agents gallery) so it survives the override.
 	settings, _ := s.Store.Settings()
 	systemPrompt := settings.SystemPrompt
 	if systemPrompt == "" {

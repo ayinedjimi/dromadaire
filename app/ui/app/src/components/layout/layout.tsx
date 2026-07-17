@@ -5,6 +5,12 @@ import { useFolder } from "@/contexts/FolderContext";
 import { ModelBar } from "@/components/ModelBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
 import { useState, useRef, useCallback, useEffect } from "react";
+import { activateTamagotchi } from "@/components/TamagotchiCompanion";
+
+// hidden easter egg: click the "Dromadaire" version badge this many times
+// within this many seconds to wake up the companion
+const EASTER_EGG_CLICKS_REQUIRED = 5;
+const EASTER_EGG_CLICK_WINDOW_MS = 3000;
 
 export function SidebarLayout({
   sidebar,
@@ -22,6 +28,18 @@ export function SidebarLayout({
   const sidebarW = settings.sidebarWidth || 280;
   const [dragWidth, setDragWidth] = useState<number | null>(null);
   const dragging = useRef(false);
+  const logoClickTimes = useRef<number[]>([]);
+
+  const handleLogoClick = useCallback(() => {
+    const now = Date.now();
+    logoClickTimes.current = [...logoClickTimes.current, now].filter(
+      (t) => now - t < EASTER_EGG_CLICK_WINDOW_MS,
+    );
+    if (logoClickTimes.current.length >= EASTER_EGG_CLICKS_REQUIRED) {
+      logoClickTimes.current = [];
+      activateTamagotchi();
+    }
+  }, []);
 
   const onResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -142,7 +160,7 @@ export function SidebarLayout({
                 <line x1="1" y1="14" x2="7" y2="14" /><line x1="9" y1="8" x2="15" y2="8" /><line x1="17" y1="16" x2="23" y2="16" />
               </svg>
             </button>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5" onClick={handleLogoClick}>
               <svg className="h-4 w-4 text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C7.58 2 4 5.58 4 10c0 3.03 1.6 5.68 4 7.13V22h8v-4.87c2.4-1.45 4-4.1 4-7.13 0-4.42-3.58-8-8-8zm-2 18v-1h4v1h-4zm4-3h-4v-1h4v1zm1.5-4.58-.82.52-.18.12V15h-5v-1.94l-.18-.12-.82-.52A5.99 5.99 0 0 1 6 10c0-3.31 2.69-6 6-6s6 2.69 6 6a5.99 5.99 0 0 1-2.5 4.42z"/></svg>
               <span className="text-[13px] font-semibold tracking-tight text-neutral-700 dark:text-neutral-200">Dromadaire</span>
               <span className="text-[10px] font-mono font-medium text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/50 rounded px-1.5 py-0.5">v7.9</span>

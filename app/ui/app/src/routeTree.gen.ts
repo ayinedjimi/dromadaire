@@ -12,8 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ModelsRouteImport } from './routes/models'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkflowsWorkflowIdRouteImport } from './routes/workflows.$workflowId'
 import { Route as CChatIdRouteImport } from './routes/c.$chatId'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -31,6 +33,11 @@ const KnowledgeRoute = KnowledgeRouteImport.update({
   path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
@@ -39,6 +46,11 @@ const AboutRoute = AboutRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkflowsWorkflowIdRoute = WorkflowsWorkflowIdRouteImport.update({
+  id: '/workflows/$workflowId',
+  path: '/workflows/$workflowId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CChatIdRoute = CChatIdRouteImport.update({
@@ -50,56 +62,76 @@ const CChatIdRoute = CChatIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agents': typeof AgentsRoute
   '/knowledge': typeof KnowledgeRoute
   '/models': typeof ModelsRoute
   '/settings': typeof SettingsRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agents': typeof AgentsRoute
   '/knowledge': typeof KnowledgeRoute
   '/models': typeof ModelsRoute
   '/settings': typeof SettingsRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agents': typeof AgentsRoute
   '/knowledge': typeof KnowledgeRoute
   '/models': typeof ModelsRoute
   '/settings': typeof SettingsRoute
   '/c/$chatId': typeof CChatIdRoute
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/about'
+    | '/agents'
     | '/knowledge'
     | '/models'
     | '/settings'
     | '/c/$chatId'
+    | '/workflows/$workflowId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/knowledge' | '/models' | '/settings' | '/c/$chatId'
+  to:
+    | '/'
+    | '/about'
+    | '/agents'
+    | '/knowledge'
+    | '/models'
+    | '/settings'
+    | '/c/$chatId'
+    | '/workflows/$workflowId'
   id:
     | '__root__'
     | '/'
     | '/about'
+    | '/agents'
     | '/knowledge'
     | '/models'
     | '/settings'
     | '/c/$chatId'
+    | '/workflows/$workflowId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AgentsRoute: typeof AgentsRoute
   KnowledgeRoute: typeof KnowledgeRoute
   ModelsRoute: typeof ModelsRoute
   SettingsRoute: typeof SettingsRoute
   CChatIdRoute: typeof CChatIdRoute
+  WorkflowsWorkflowIdRoute: typeof WorkflowsWorkflowIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -125,6 +157,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/about': {
       id: '/about'
       path: '/about'
@@ -137,6 +176,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workflows/$workflowId': {
+      id: '/workflows/$workflowId'
+      path: '/workflows/$workflowId'
+      fullPath: '/workflows/$workflowId'
+      preLoaderRoute: typeof WorkflowsWorkflowIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/c/$chatId': {
@@ -152,10 +198,12 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AgentsRoute: AgentsRoute,
   KnowledgeRoute: KnowledgeRoute,
   ModelsRoute: ModelsRoute,
   SettingsRoute: SettingsRoute,
   CChatIdRoute: CChatIdRoute,
+  WorkflowsWorkflowIdRoute: WorkflowsWorkflowIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

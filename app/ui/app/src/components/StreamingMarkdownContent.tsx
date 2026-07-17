@@ -284,6 +284,16 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
     // Auto-open preview panel during streaming by parsing raw markdown
     useAutoArtifactPreview(content, isStreaming, artifactsEnabled ?? false, onArtifactPreview);
 
+    // Once streaming ends, `parseIncompleteMarkdown` turns off and an unclosed
+    // ``` fence (model truncated mid-block) no longer parses as a <pre><code>
+    // element, silently dropping the Aperçu button. Rebalance the fence so the
+    // final render still treats it as a real (if truncated) code block.
+    const displayContent = React.useMemo(() => {
+      if (isStreaming) return content;
+      const fenceCount = (content.match(/```/g) || []).length;
+      return fenceCount % 2 !== 0 ? `${content}\n\`\`\`` : content;
+    }, [content, isStreaming]);
+
     // Build the remark plugins array - keep default GFM and Math, add citations
     const remarkPlugins = React.useMemo(() => {
       const plugins: any[] = [
@@ -504,7 +514,7 @@ const StreamingMarkdownContent: React.FC<StreamingMarkdownContentProps> =
               },
             }}
           >
-            {content}
+            {displayContent}
           </Streamdown>
           {isStreaming && <span className="streaming-caret" aria-hidden="true" />}
         </StreamingMarkdownErrorBoundary>

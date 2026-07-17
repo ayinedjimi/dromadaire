@@ -347,6 +347,32 @@ export async function getSettings(): Promise<{
   };
 }
 
+export interface ExternalServerStatus {
+  running: boolean;
+  port: string;
+}
+
+export async function getExternalServerStatus(): Promise<ExternalServerStatus> {
+  const response = await fetch(`${API_BASE}/api/v1/external-server`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch external server status");
+  }
+  return response.json();
+}
+
+export async function setExternalServer(enabled: boolean): Promise<ExternalServerStatus> {
+  const response = await fetch(`${API_BASE}/api/v1/external-server`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || "Failed to update external server");
+  }
+  return response.json();
+}
+
 export async function updateSettings(settings: Settings): Promise<{
   settings: Settings;
 }> {

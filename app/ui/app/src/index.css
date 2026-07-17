@@ -262,6 +262,12 @@ html, body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Tint the whole GUI to the active agent's accent color (see useTheme.ts) */
+html.agent-theme-active {
+  filter: sepia(1) saturate(6) hue-rotate(var(--agent-theme-hue, 283deg)) brightness(1.03);
+  transition: filter 0.3s ease;
+}
+
 /* 5. Textarea focus glow */
 @keyframes focus-glow {
   from { box-shadow: 0 0 0 3px hsl(var(--accent-000) / 25%); }
