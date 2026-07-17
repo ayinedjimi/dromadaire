@@ -84,6 +84,15 @@ Developpe par [AYI NEDJIMI Consultants](https://ayinedjimi-consultants.fr), spec
   <br><em>Parametres — Performance, themes, configuration des threads CPU</em>
 </p>
 
+### Modeles pre-installes
+
+L'installeur inclut deux modeles prets a l'emploi :
+
+| Modele | Taille | Usage |
+|--------|--------|-------|
+| `tinyllama` | 608 Mo | Chat rapide, ideal pour tester |
+| `snowflake-arctic-embed:33m` | 64 Mo | Embedding pour le RAG |
+
 ---
 
 ## Installation

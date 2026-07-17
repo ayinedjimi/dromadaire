@@ -5,9 +5,9 @@
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DARCH=amd64 .\dromadaire.iss
 
 #define MyAppName "Dromadaire"
-#define MyAppVersion "3.0.0"
+#define MyAppVersion "7.9.0"
 #define MyAppPublisher "INTELLIGENCE PRIVEE"
-#define MyAppURL "https://github.com/intelligence-privee/dromadaire"
+#define MyAppURL "https://github.com/ayinedjimi/dromadaire"
 #define MyAppExeName "dromadaire.exe"
 #define MyServerExeName "ollama.exe"
 #define MyIcon ".\assets\app.ico"
@@ -131,7 +131,7 @@ Root: HKCU; Subkey: "Environment"; \
 
 [Messages]
 WelcomeLabel1=Bienvenue dans l'installation de Dromadaire
-WelcomeLabel2=Dromadaire v1.0 par INTELLIGENCE PRIVEE%n%nVotre assistant IA local et confidentiel.%nAucune telemetrie, aucune donnee envoyee.%n%nCliquez sur Suivant pour continuer.
+WelcomeLabel2=Dromadaire v7.9 par INTELLIGENCE PRIVEE%n%nVotre assistant IA local et confidentiel.%nAucune telemetrie, aucune donnee envoyee.%n%nCliquez sur Suivant pour continuer.
 FinishedHeadingLabel=Installation terminee
 FinishedLabel=Dromadaire a ete installe avec succes.%n%nVous pouvez maintenant lancer l'application depuis le Bureau ou le menu Demarrer.
 
