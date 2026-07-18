@@ -14,6 +14,7 @@ import { recordAgentRun, useUsageStats } from "@/hooks/useUsageStats";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { showToast } from "@/components/Toast";
 
 const COLORS = [
   { label: "Bleu", value: "#3b82f6" },
@@ -328,6 +329,7 @@ export default function AgentsGallery() {
       Agent: agent.taskExecution,
     });
     navigate({ to: "/" });
+    showToast({ emoji: agent.emoji, message: `${agent.name} activé — pose ta question` });
   };
 
   const confirmDeleteAgent = (id: string, name: string) => {

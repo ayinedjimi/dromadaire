@@ -262,10 +262,17 @@ html, body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Tint the whole GUI to the active agent's accent color (see useTheme.ts) */
-html.agent-theme-active {
-  filter: sepia(1) saturate(6) hue-rotate(var(--agent-theme-hue, 283deg)) brightness(1.03);
-  transition: filter 0.3s ease;
+/* Workflow canvas: React Flow's default connection handles (~6px) are too
+   small to reliably drag from — enlarge the hit area so dragging a
+   connection doesn't accidentally grab/move the node instead. */
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+  border: 2px solid white !important;
+}
+.react-flow__handle:hover {
+  width: 16px !important;
+  height: 16px !important;
 }
 
 /* 5. Textarea focus glow */

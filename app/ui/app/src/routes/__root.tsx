@@ -13,6 +13,7 @@ import { SearchModal } from "@/components/SearchModal";
 import { DiscretionOverlay } from "@/components/DiscretionOverlay";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { TamagotchiCompanion } from "@/components/TamagotchiCompanion";
+import { Toast } from "@/components/Toast";
 
 function RootComponent() {
   // This hook ensures settings are fetched on app startup
@@ -147,6 +148,7 @@ function AppShell({ settings }: { settings?: { KeyboardShortcutsEnabled?: boolea
       {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
       <DiscretionOverlay active={discretionActive} onDeactivate={() => setDiscretionActive(false)} />
       <TamagotchiCompanion />
+      <Toast />
     </div>
   );
 }

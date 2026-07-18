@@ -45,14 +45,6 @@ function subscribe(callback: () => void) {
   return () => listeners.delete(callback);
 }
 
-// Looks up the accent color of any user-created agent using this model
-// (base name, tag-agnostic), for theming the GUI to match the active agent.
-export function getAgentColorForModel(modelName: string): string | null {
-  const baseName = modelName.split(":")[0];
-  const match = readAgents().find((a) => a.model.split(":")[0] === baseName);
-  return match?.color ?? null;
-}
-
 export function useAgents() {
   const agents = useSyncExternalStore(subscribe, readAgents, () => []);
 

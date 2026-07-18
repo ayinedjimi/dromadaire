@@ -72,7 +72,7 @@ function AgentNode({ id, data }: NodeProps<Node<AgentNodeData>>) {
 function ConditionNode({ data }: NodeProps<Node<ConditionNodeData>>) {
   const { matchText, status } = data;
   return (
-    <div className="relative flex min-w-44 items-center gap-2.5 rounded-xl border-2 border-orange-500 bg-white px-3 py-2.5 shadow-sm dark:bg-zinc-800">
+    <div className="relative flex min-h-20 min-w-44 items-center gap-2.5 rounded-xl border-2 border-orange-500 bg-white px-3 py-3 shadow-sm dark:bg-zinc-800">
       <Handle type="target" position={Position.Left} />
       <StatusDot status={status} />
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-400">
@@ -82,10 +82,10 @@ function ConditionNode({ data }: NodeProps<Node<ConditionNodeData>>) {
         <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Condition</div>
         <div className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{matchText ? `contient "${matchText}"` : "(vide)"}</div>
       </div>
-      <Handle type="source" position={Position.Right} id="true" style={{ top: "35%" }} />
-      <Handle type="source" position={Position.Right} id="false" style={{ top: "65%" }} />
-      <span className="absolute -right-9 top-[26%] text-[9px] font-medium text-green-600 dark:text-green-400">vrai</span>
-      <span className="absolute -right-9 top-[58%] text-[9px] font-medium text-red-500">faux</span>
+      <Handle type="source" position={Position.Right} id="true" style={{ top: "20%" }} className="!bg-green-500" />
+      <Handle type="source" position={Position.Right} id="false" style={{ top: "80%" }} className="!bg-red-500" />
+      <span className="absolute -right-9 top-[13%] text-[9px] font-medium text-green-600 dark:text-green-400">vrai</span>
+      <span className="absolute -right-9 top-[73%] text-[9px] font-medium text-red-500">faux</span>
     </div>
   );
 }
