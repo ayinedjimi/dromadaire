@@ -17,6 +17,27 @@ import { dromadaireClient as ollama } from "./lib/dromadaire-client";
 import type { ModelResponse } from "ollama/browser";
 import { API_BASE, OLLAMA_DOT_COM } from "./lib/config";
 
+// Dromadaire: RAG scoping for the active agent (see AgentsGallery.tsx).
+// Kept out of persisted Settings since that's backed by fixed SQL columns.
+const ACTIVE_AGENT_RAG_DOCS_KEY = "dromadaire-active-rag-doc-ids";
+
+export function setActiveAgentRAGDocumentIds(ids: string[]) {
+  if (ids.length > 0) {
+    localStorage.setItem(ACTIVE_AGENT_RAG_DOCS_KEY, JSON.stringify(ids));
+  } else {
+    localStorage.removeItem(ACTIVE_AGENT_RAG_DOCS_KEY);
+  }
+}
+
+function getActiveAgentRAGDocumentIds(): string[] {
+  try {
+    const raw = localStorage.getItem(ACTIVE_AGENT_RAG_DOCS_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 // Extend Model class with utility methods
 declare module "@/gotypes" {
   interface Model {
@@ -278,6 +299,9 @@ export async function* sendMessage(
         // Always send web_search as a boolean value (default to false)
         web_search: webSearch ?? false,
         file_tools: fileTools ?? false,
+        ...(getActiveAgentRAGDocumentIds().length > 0
+          ? { rag_document_ids: getActiveAgentRAGDocumentIds() }
+          : {}),
         ...(forceUpdate !== undefined ? { forceUpdate } : {}),
         ...(shouldSendThink ? { think } : {}),
         ...(modelParams?.temperature !== undefined ? { temperature: modelParams.temperature } : {}),

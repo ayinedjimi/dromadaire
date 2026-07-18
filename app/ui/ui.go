@@ -2520,7 +2520,11 @@ Avant le bloc de code, écris UNE phrase décrivant brièvement ce que tu as cr�
 	}
 
 	// Inject RAG context if enabled
-	ragContext, ragSources := s.buildRAGContext(chat)
+	var allowedDocIDs []string
+	if frontendReq != nil {
+		allowedDocIDs = frontendReq.RAGDocumentIDs
+	}
+	ragContext, ragSources := s.buildRAGContext(chat, allowedDocIDs)
 	if ragContext != "" {
 		systemPrompt += "\n\n" + ragContext
 	}
@@ -2745,7 +2749,9 @@ Avant le bloc de code, écris UNE phrase décrivant brièvement ce que tu as cr�
 
 // ========== RAG ==========
 
-func (s *Server) buildRAGContext(chat *store.Chat) (string, []store.RAGSource) {
+// buildRAGContext assembles the RAG system-prompt context. If allowedDocIDs
+// is non-empty, only those documents are considered (per-agent RAG scoping).
+func (s *Server) buildRAGContext(chat *store.Chat, allowedDocIDs []string) (string, []store.RAGSource) {
 	settings, err := s.Store.Settings()
 	if err != nil || !settings.RAGEnabled {
 		return "", nil
@@ -2767,6 +2773,23 @@ func (s *Server) buildRAGContext(chat *store.Chat) (string, []store.RAGSource) {
 	docs, err := s.Store.RAGDocuments()
 	if err != nil || len(docs) == 0 {
 		return "", nil
+	}
+
+	if len(allowedDocIDs) > 0 {
+		allowed := make(map[string]bool, len(allowedDocIDs))
+		for _, id := range allowedDocIDs {
+			allowed[id] = true
+		}
+		filtered := docs[:0]
+		for _, d := range docs {
+			if allowed[d.ID] {
+				filtered = append(filtered, d)
+			}
+		}
+		docs = filtered
+		if len(docs) == 0 {
+			return "", nil
+		}
 	}
 
 	// Adaptive strategy: full inject if all docs fit within 70% of remaining context

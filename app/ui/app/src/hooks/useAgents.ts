@@ -9,6 +9,7 @@ export interface Agent {
   systemPrompt: string;
   webSearch: boolean;
   rag: boolean;
+  ragDocumentIds: string[];
   taskExecution: boolean;
 }
 

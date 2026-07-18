@@ -135,6 +135,7 @@ type ChatRequest struct {
 	Attachments []Attachment `json:"attachments,omitempty"`
 	WebSearch   *bool        `json:"web_search,omitempty"`
 	FileTools   *bool        `json:"file_tools,omitempty"`
+	RAGDocumentIDs []string  `json:"rag_document_ids,omitempty"`
 	ForceUpdate bool         `json:"forceUpdate,omitempty"`
 	Think       any          `json:"think,omitempty"`
 	Format      any          `json:"format,omitempty"`

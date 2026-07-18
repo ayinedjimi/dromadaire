@@ -2,7 +2,14 @@ import { useCallback, useSyncExternalStore } from "react";
 
 export interface WorkflowNodeData {
   id: string;
-  agentId: string;
+  kind?: "agent" | "condition"; // default "agent" when absent
+  agentId: string; // unused when kind === "condition"
+  // condition node: routes to the "true" or "false" outgoing edge depending
+  // on whether matchText is found in the predecessor's output
+  matchText?: string;
+  // agent node: optional template composing the input from predecessors,
+  // e.g. "Corrige ce texte : {{Redacteur.output}}". Empty = auto-concatenate.
+  promptTemplate?: string;
   position: { x: number; y: number };
 }
 
@@ -10,6 +17,7 @@ export interface WorkflowEdgeData {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: "true" | "false"; // set when the source is a condition node
 }
 
 export interface Workflow {

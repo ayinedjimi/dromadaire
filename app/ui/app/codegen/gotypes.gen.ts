@@ -622,6 +622,7 @@ export class ChatRequest {
     attachments?: Attachment[];
     web_search?: boolean;
     file_tools?: boolean;
+    rag_document_ids?: string[];
     forceUpdate?: boolean;
     think?: any;
     temperature?: number;
@@ -653,6 +654,7 @@ export class ChatRequest {
         this.attachments = this.convertValues(source["attachments"], Attachment);
         this.web_search = source["web_search"];
         this.file_tools = source["file_tools"];
+        this.rag_document_ids = source["rag_document_ids"];
         this.forceUpdate = source["forceUpdate"];
         this.think = source["think"];
         this.format = source["format"];
