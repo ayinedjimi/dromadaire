@@ -17,7 +17,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowLeft, Play, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning, Robot, Plus } from "@phosphor-icons/react";
+import { ArrowLeft, Play, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning, Robot, Plus, CircleNotch } from "@phosphor-icons/react";
 import { useWorkflows, type WorkflowNodeData, type WorkflowEdgeData } from "@/hooks/useWorkflows";
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useSettings } from "@/hooks/useSettings";
@@ -357,7 +357,8 @@ export default function WorkflowBuilder() {
           </Button>
         )}
         <Button color="blue" onClick={launch} disabled={running || nodes.length === 0}>
-          <Play size={14} weight="fill" /> {running ? "En cours..." : "Lancer"}
+          {running ? <CircleNotch size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
+          {running ? "En cours..." : "Lancer"}
         </Button>
       </div>
 
@@ -422,13 +423,21 @@ export default function WorkflowBuilder() {
               transition={{ duration: 0.2 }}
               className="flex flex-col overflow-hidden border-l border-zinc-950/8 dark:border-white/10"
             >
-              <div className="border-b border-zinc-950/8 px-3 py-2.5 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+              <div className="flex items-center gap-1.5 border-b border-zinc-950/8 px-3 py-2.5 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+                {running && <CircleNotch size={12} className="animate-spin" />}
                 Sortie {activeNodeId ? "en cours" : "du dernier nœud actif"}
               </div>
               <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-3 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
                 {activeNodeId && transcript[activeNodeId]
                   ? transcript[activeNodeId]
-                  : Object.values(transcript)[Object.values(transcript).length - 1] || "En attente de contenu..."}
+                  : Object.values(transcript)[Object.values(transcript).length - 1] || (
+                    running ? (
+                      <span className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
+                        <CircleNotch size={14} className="animate-spin" />
+                        Le modèle réfléchit... (peut prendre plusieurs minutes sur CPU)
+                      </span>
+                    ) : "En attente de contenu..."
+                  )}
               </div>
             </motion.div>
           )}
