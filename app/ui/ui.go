@@ -368,6 +368,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/v1/cloud", handle(s.cloudSetting))
 	mux.Handle("GET /api/v1/external-server", handle(s.externalServerStatus))
 	mux.Handle("POST /api/v1/external-server", handle(s.setExternalServer))
+	mux.Handle("GET /api/v1/sandbox-status", handle(s.sandboxStatus))
 	mux.Handle("GET /api/v1/encryption-key", handle(s.getEncryptionKey))
 
 	// Dromadaire: advanced performance endpoints
@@ -1025,6 +1026,13 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 				delete(s.pendingApprovals, chat.ID)
 				s.pendingApprovalsMu.Unlock()
 			}()
+
+			// Dromadaire: sandboxed JS/TS execution — safer alternative to bash,
+			// no per-call approval needed since Deno denies network/env/subprocess/FFI
+			// at the OS level. Only registered when a Deno runtime is actually found.
+			if denoPath := tools.ResolveDenoPath(); denoPath != "" {
+				registry.Register(tools.NewJSSandbox(s.WorkingDir, denoPath))
+			}
 		}
 	}
 
@@ -2206,6 +2214,15 @@ func (s *Server) writeCloudStatus(w http.ResponseWriter) error {
 
 // externalServerStatus reports whether the standalone, port-11434 ollama
 // server (for third-party Ollama-compatible apps) is currently running.
+// sandboxStatus reports whether a Deno runtime is available, so the UI can
+// tell the user whether the sandboxed JS tool will actually be usable.
+func (s *Server) sandboxStatus(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]any{
+		"denoAvailable": tools.ResolveDenoPath() != "",
+	})
+}
+
 func (s *Server) externalServerStatus(w http.ResponseWriter, r *http.Request) error {
 	running := s.OllamaServer != nil && s.OllamaServer.ExternalServerRunning()
 	w.Header().Set("Content-Type", "application/json")

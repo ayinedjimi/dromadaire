@@ -384,6 +384,14 @@ export async function getExternalServerStatus(): Promise<ExternalServerStatus> {
   return response.json();
 }
 
+export async function getSandboxStatus(): Promise<{ denoAvailable: boolean }> {
+  const response = await fetch(`${API_BASE}/api/v1/sandbox-status`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch sandbox status");
+  }
+  return response.json();
+}
+
 export async function setExternalServer(enabled: boolean): Promise<ExternalServerStatus> {
   const response = await fetch(`${API_BASE}/api/v1/external-server`, {
     method: "POST",

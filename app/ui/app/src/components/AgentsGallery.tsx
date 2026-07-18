@@ -9,7 +9,7 @@ import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import { useModels } from "@/hooks/useModels";
 import { useSettings } from "@/hooks/useSettings";
-import { getRAGDocuments, setActiveAgentRAGDocumentIds, type RAGDocument } from "@/api";
+import { getRAGDocuments, setActiveAgentRAGDocumentIds, getSandboxStatus, type RAGDocument } from "@/api";
 import { recordAgentRun, useUsageStats } from "@/hooks/useUsageStats";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,11 @@ function AgentForm({ editing, onClose }: { editing?: Agent; onClose: () => void 
   const { createAgent, updateAgent } = useAgents();
   const { data: models = [] } = useModels();
   const [ragDocs, setRagDocs] = useState<RAGDocument[]>([]);
+  const [denoAvailable, setDenoAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getSandboxStatus().then((s) => setDenoAvailable(s.denoAvailable)).catch(() => setDenoAvailable(false));
+  }, []);
 
   const [name, setName] = useState(editing?.name ?? "");
   const [emoji, setEmoji] = useState(editing?.emoji ?? EMOJIS[0]);
@@ -142,7 +147,16 @@ function AgentForm({ editing, onClose }: { editing?: Agent; onClose: () => void 
         <div className="space-y-2">
           <ToolToggle icon={<Globe size={16} />} label="Recherche web" checked={webSearch} onChange={setWebSearch} />
           <ToolToggle icon={<BookOpen size={16} />} label="Base de connaissances (RAG)" checked={rag} onChange={setRag} />
-          <ToolToggle icon={<Terminal size={16} />} label="Exécution de tâches" sublabel="commandes, approbation requise à chaque appel" checked={taskExecution} onChange={setTaskExecution} />
+          <ToolToggle icon={<Terminal size={16} />} label="Exécution de tâches" sublabel="commandes shell, approbation requise à chaque appel" checked={taskExecution} onChange={setTaskExecution} />
+          {taskExecution && (
+            <p className="pl-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {denoAvailable === null
+                ? "Vérification du bac à sable JavaScript..."
+                : denoAvailable
+                  ? "✓ Bac à sable JavaScript (Deno) aussi disponible — sans réseau/fichiers hors dossier, sans approbation requise."
+                  : "Bac à sable JavaScript indisponible (Deno non détecté) — seules les commandes shell (avec approbation) seront proposées."}
+            </p>
+          )}
         </div>
 
         <AnimatePresence>
