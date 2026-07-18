@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ReactFlow,
   Background,
@@ -16,12 +17,14 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowLeft, Play, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning } from "@phosphor-icons/react";
+import { ArrowLeft, Play, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning, Robot, Plus } from "@phosphor-icons/react";
 import { useWorkflows, type WorkflowNodeData, type WorkflowEdgeData } from "@/hooks/useWorkflows";
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useSettings } from "@/hooks/useSettings";
 import { runWorkflow, detectCycle, type NodeStatus } from "@/lib/workflowRunner";
 import { recordWorkflowRun } from "@/hooks/useUsageStats";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface AgentNodeData extends Record<string, unknown> {
   agent?: Agent;
@@ -35,20 +38,31 @@ interface ConditionNodeData extends Record<string, unknown> {
 }
 
 const STATUS_COLOR: Record<NodeStatus, string> = {
-  idle: "#94a3b8", running: "#3b82f6", done: "#22c55e", error: "#ef4444", skipped: "#c4c4c4",
+  idle: "#a1a1aa", running: "#3b82f6", done: "#22c55e", error: "#ef4444", skipped: "#d4d4d8",
 };
+
+function StatusDot({ status }: { status: NodeStatus }) {
+  return (
+    <span className="relative flex h-2 w-2 shrink-0">
+      {status === "running" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: STATUS_COLOR[status] }} />}
+      <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: STATUS_COLOR[status] }} />
+    </span>
+  );
+}
 
 function AgentNode({ id, data }: NodeProps<Node<AgentNodeData>>) {
   const { agent, status, promptTemplate } = data;
   return (
-    <div className="workflow-node" style={{ borderColor: agent?.color ?? "#94a3b8" }}>
+    <div className="flex min-w-44 items-center gap-2.5 rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm dark:bg-zinc-800" style={{ borderColor: agent?.color ?? "#a1a1aa" }}>
       <Handle type="target" position={Position.Left} />
-      <div className="workflow-node-status" style={{ background: STATUS_COLOR[status] }} />
-      <div className="workflow-node-emoji">{agent?.emoji ?? "❓"}</div>
-      <div className="workflow-node-body">
-        <div className="workflow-node-name">{agent?.name ?? "Agent supprimé"}</div>
-        <div className="workflow-node-model">{agent?.model}</div>
-        {promptTemplate && <div className="workflow-node-template" title={promptTemplate}>✎ template</div>}
+      <StatusDot status={status} />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base" style={{ background: `${agent?.color ?? "#a1a1aa"}1f` }}>
+        {agent?.emoji ?? "❓"}
+      </div>
+      <div className="min-w-0">
+        <div className="truncate text-xs font-semibold text-zinc-900 dark:text-zinc-100">{agent?.name ?? "Agent supprimé"}</div>
+        <div className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{agent?.model}</div>
+        {promptTemplate && <div className="text-[9px] text-zinc-400 dark:text-zinc-500">✎ template</div>}
       </div>
       <Handle type="source" position={Position.Right} id={id} />
     </div>
@@ -58,18 +72,20 @@ function AgentNode({ id, data }: NodeProps<Node<AgentNodeData>>) {
 function ConditionNode({ data }: NodeProps<Node<ConditionNodeData>>) {
   const { matchText, status } = data;
   return (
-    <div className="workflow-node workflow-node-condition">
+    <div className="relative flex min-w-44 items-center gap-2.5 rounded-xl border-2 border-orange-500 bg-white px-3 py-2.5 shadow-sm dark:bg-zinc-800">
       <Handle type="target" position={Position.Left} />
-      <div className="workflow-node-status" style={{ background: STATUS_COLOR[status] }} />
-      <GitBranch size={16} />
-      <div className="workflow-node-body">
-        <div className="workflow-node-name">Condition</div>
-        <div className="workflow-node-model">{matchText ? `contient "${matchText}"` : "(vide)"}</div>
+      <StatusDot status={status} />
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/15 text-orange-600 dark:text-orange-400">
+        <GitBranch size={16} />
+      </div>
+      <div className="min-w-0">
+        <div className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">Condition</div>
+        <div className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{matchText ? `contient "${matchText}"` : "(vide)"}</div>
       </div>
       <Handle type="source" position={Position.Right} id="true" style={{ top: "35%" }} />
       <Handle type="source" position={Position.Right} id="false" style={{ top: "65%" }} />
-      <span className="workflow-node-handle-label workflow-node-handle-true">vrai</span>
-      <span className="workflow-node-handle-label workflow-node-handle-false">faux</span>
+      <span className="absolute -right-9 top-[26%] text-[9px] font-medium text-green-600 dark:text-green-400">vrai</span>
+      <span className="absolute -right-9 top-[58%] text-[9px] font-medium text-red-500">faux</span>
     </div>
   );
 }
@@ -97,6 +113,22 @@ function toWorkflowEdges(edges: Edge[]): WorkflowEdgeData[] {
     target: e.target,
     ...(e.sourceHandle === "true" || e.sourceHandle === "false" ? { sourceHandle: e.sourceHandle } : {}),
   }));
+}
+
+function ToolbarButton({ onClick, title, icon, danger }: { onClick: () => void; title: string; icon: React.ReactNode; danger?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
+        danger
+          ? "text-amber-600 hover:bg-amber-500/10 dark:text-amber-400"
+          : "text-zinc-500 hover:bg-zinc-950/5 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-zinc-100"
+      }`}
+    >
+      {icon}
+    </button>
+  );
 }
 
 export default function WorkflowBuilder() {
@@ -133,7 +165,6 @@ export default function WorkflowBuilder() {
   const [hasError, setHasError] = useState(false);
   const [lastOutputs, setLastOutputs] = useState<Map<string, string> | null>(null);
 
-  // T1: undo/redo history
   const history = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
 
@@ -170,10 +201,7 @@ export default function WorkflowBuilder() {
   }, [undo, redo]);
 
   const onConnect = useCallback(
-    (connection: Connection) => {
-      pushHistory();
-      setEdges((eds) => addEdge({ ...connection, animated: false }, eds));
-    },
+    (connection: Connection) => { pushHistory(); setEdges((eds) => addEdge({ ...connection, animated: false }, eds)); },
     [setEdges, pushHistory],
   );
 
@@ -206,7 +234,6 @@ export default function WorkflowBuilder() {
     setEdges((eds) => eds.filter((e) => !e.selected));
   }, [setNodes, setEdges, pushHistory]);
 
-  // W4: layer nodes by BFS depth from sources, position each layer as a column
   const autoLayout = useCallback(() => {
     const incoming = new Map<string, string[]>();
     nodes.forEach((n) => incoming.set(n.id, []));
@@ -285,8 +312,6 @@ export default function WorkflowBuilder() {
 
   const launch = useCallback(() => runFrom(), [runFrom]);
 
-  // W5: resume — reuse outputs already captured for nodes that finished ok,
-  // only re-run nodes that errored or never ran
   const retryFromErrors = useCallback(() => {
     if (!lastOutputs) return;
     const skip = new Set<string>();
@@ -297,49 +322,70 @@ export default function WorkflowBuilder() {
   }, [lastOutputs, nodes, runFrom]);
 
   if (!workflow) {
-    return <div className="workflow-missing">Workflow introuvable. <button onClick={() => navigate({ to: "/agents" })}>Retour</button></div>;
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 text-zinc-500">
+        <p>Workflow introuvable.</p>
+        <Button outline onClick={() => navigate({ to: "/agents" })}><ArrowLeft size={14} /> Retour</Button>
+      </div>
+    );
   }
 
   return (
-    <div className="workflow-page">
-      <div className="workflow-header">
-        <button className="agents-back" onClick={() => navigate({ to: "/agents" })}><ArrowLeft size={16} /></button>
-        <h1 className="workflow-title">{workflow.name}</h1>
-        <input
-          className="workflow-prompt-input"
-          placeholder="Message initial du workflow..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-        <button className="agent-btn-secondary" onClick={undo} title="Annuler (Ctrl+Z)"><ArrowCounterClockwise size={14} /></button>
-        <button className="agent-btn-secondary" onClick={redo} title="Rétablir (Ctrl+Y)"><ArrowClockwise size={14} /></button>
-        <button className="agent-btn-secondary" onClick={autoLayout} title="Ranger automatiquement"><SquaresFour size={14} /></button>
-        <button className="agent-btn-secondary" onClick={() => setShowPalette((v) => !v)}>+ Agent</button>
-        <button className="agent-btn-secondary" onClick={addConditionNode} title="Ajouter une condition"><GitBranch size={14} /></button>
-        <button className="agent-btn-secondary" onClick={persist}><FloppyDisk size={14} /> Sauver</button>
-        {hasError && !running && (
-          <button className="agent-btn-secondary workflow-retry-btn" onClick={retryFromErrors} title="Relancer uniquement les étapes échouées/non exécutées">
-            <ArrowsClockwise size={14} /> Reprendre
-          </button>
-        )}
-        <button className="agent-btn-primary" onClick={launch} disabled={running || nodes.length === 0}>
-          <Play size={14} weight="fill" /> {running ? "En cours..." : "Lancer"}
+    <div className="flex h-screen flex-col bg-white dark:bg-zinc-900">
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-zinc-950/8 px-4 py-2.5 dark:border-white/10">
+        <button onClick={() => navigate({ to: "/agents" })} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-950/5 dark:text-zinc-400 dark:hover:bg-white/10">
+          <ArrowLeft size={16} />
         </button>
+        <h1 className="mr-2 whitespace-nowrap text-sm font-bold text-zinc-950 dark:text-white">{workflow.name}</h1>
+        <div className="min-w-40 flex-1">
+          <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Message initial du workflow..." />
+        </div>
+
+        <div className="flex items-center gap-0.5 rounded-lg bg-zinc-950/3 p-0.5 dark:bg-white/5">
+          <ToolbarButton onClick={undo} title="Annuler (Ctrl+Z)" icon={<ArrowCounterClockwise size={15} />} />
+          <ToolbarButton onClick={redo} title="Rétablir (Ctrl+Y)" icon={<ArrowClockwise size={15} />} />
+          <ToolbarButton onClick={autoLayout} title="Ranger automatiquement" icon={<SquaresFour size={15} />} />
+        </div>
+
+        <Button outline onClick={() => setShowPalette((v) => !v)}><Plus size={14} /> Agent</Button>
+        <Button outline onClick={addConditionNode}><GitBranch size={14} /> Condition</Button>
+        <Button plain onClick={persist} title="Sauvegarder"><FloppyDisk size={14} /></Button>
+
+        {hasError && !running && (
+          <Button color="amber" onClick={retryFromErrors} title="Relancer uniquement les étapes échouées/non exécutées">
+            <ArrowsClockwise size={14} /> Reprendre
+          </Button>
+        )}
+        <Button color="blue" onClick={launch} disabled={running || nodes.length === 0}>
+          <Play size={14} weight="fill" /> {running ? "En cours..." : "Lancer"}
+        </Button>
       </div>
 
-      {showPalette && (
-        <div className="workflow-palette">
-          {agents.length === 0 && <div className="workflow-palette-empty">Aucun agent créé. Crée d'abord des agents dans la galerie.</div>}
-          {agents.map((a) => (
-            <button key={a.id} className="workflow-palette-item" onClick={() => addAgentNode(a)}>
-              <span>{a.emoji}</span> {a.name}
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {showPalette && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.12 }}
+            className="absolute right-4 top-14 z-20 flex max-h-64 w-56 flex-col gap-0.5 overflow-y-auto rounded-xl border border-zinc-950/10 bg-white p-1.5 shadow-xl dark:border-white/10 dark:bg-zinc-800"
+          >
+            {agents.length === 0 && <div className="max-w-52 p-2 text-xs text-zinc-500 dark:text-zinc-400">Aucun agent créé. Crée d'abord des agents dans la galerie.</div>}
+            {agents.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => addAgentNode(a)}
+                className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-700 hover:bg-zinc-950/5 dark:text-zinc-200 dark:hover:bg-white/10"
+              >
+                <span>{a.emoji}</span> {a.name}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="workflow-body">
-        <div className="workflow-canvas">
+      <div className="relative flex min-h-0 flex-1">
+        <div className="min-w-0 flex-1">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -356,76 +402,52 @@ export default function WorkflowBuilder() {
           >
             <Background />
             <Controls />
-            <MiniMap />
+            <MiniMap className="!bg-white dark:!bg-zinc-800" maskColor="rgb(0 0 0 / 0.08)" />
           </ReactFlow>
+
+          {nodes.length === 0 && (
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-600">
+              <Robot size={36} />
+              <p className="text-sm">Ajoute un agent pour commencer</p>
+            </div>
+          )}
         </div>
 
-        {(running || Object.keys(transcript).length > 0) && (
-          <div className="workflow-transcript">
-            <div className="workflow-transcript-header">
-              <span>Sortie {activeNodeId ? "en cours" : "du dernier nœud actif"}</span>
-            </div>
-            <div className="workflow-transcript-body">
-              {activeNodeId && transcript[activeNodeId]
-                ? transcript[activeNodeId]
-                : Object.values(transcript)[Object.values(transcript).length - 1] || "En attente de contenu..."}
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {(running || Object.keys(transcript).length > 0) && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 320, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex flex-col overflow-hidden border-l border-zinc-950/8 dark:border-white/10"
+            >
+              <div className="border-b border-zinc-950/8 px-3 py-2.5 text-xs font-semibold text-zinc-500 dark:border-white/10 dark:text-zinc-400">
+                Sortie {activeNodeId ? "en cours" : "du dernier nœud actif"}
+              </div>
+              <div className="flex-1 overflow-y-auto whitespace-pre-wrap p-3 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+                {activeNodeId && transcript[activeNodeId]
+                  ? transcript[activeNodeId]
+                  : Object.values(transcript)[Object.values(transcript).length - 1] || "En attente de contenu..."}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {hasError && (
-        <div className="workflow-error-banner"><Warning size={14} /> Une ou plusieurs étapes ont échoué. Utilise "Reprendre" pour relancer uniquement celles-ci.</div>
+        <div className="flex items-center gap-2 border-t border-red-500/20 bg-red-500/5 px-4 py-2 text-xs text-red-600 dark:text-red-400">
+          <Warning size={14} /> Une ou plusieurs étapes ont échoué. Utilise "Reprendre" pour relancer uniquement celles-ci.
+        </div>
       )}
 
-      <button className="workflow-delete-hint agent-btn-secondary" onClick={deleteSelection} title="Supprimer la sélection">
+      <button
+        onClick={deleteSelection}
+        title="Supprimer la sélection"
+        className="absolute bottom-3 left-3 z-10 rounded-lg border border-zinc-950/10 bg-white px-2.5 py-1.5 text-xs text-zinc-500 opacity-70 hover:opacity-100 dark:border-white/10 dark:bg-zinc-800 dark:text-zinc-400"
+      >
         Supprimer la sélection
       </button>
-
-      <style>{`
-        .workflow-page { display: flex; flex-direction: column; height: 100vh; position: relative; }
-        .workflow-header { display: flex; align-items: center; gap: 6px; padding: 12px 16px; border-bottom: 1px solid hsl(0 0% 88%); flex-wrap: wrap; }
-        .workflow-title { font-size: 15px; font-weight: 700; margin-right: 8px; white-space: nowrap; }
-        .workflow-prompt-input { flex: 1; min-width: 160px; padding: 7px 10px; border-radius: 8px; border: 1px solid hsl(0 0% 85%); font-size: 13px; background: hsl(0 0% 100%); color: inherit; }
-        .workflow-body { flex: 1; min-height: 0; display: flex; }
-        .workflow-canvas { flex: 1; min-height: 0; }
-        .workflow-transcript { width: 320px; border-left: 1px solid hsl(0 0% 88%); display: flex; flex-direction: column; }
-        .workflow-transcript-header { padding: 10px 12px; font-size: 12px; font-weight: 600; opacity: 0.7; border-bottom: 1px solid hsl(0 0% 92%); }
-        .workflow-transcript-body { flex: 1; overflow-y: auto; padding: 12px; font-size: 12px; white-space: pre-wrap; line-height: 1.5; }
-        .workflow-error-banner { display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: hsl(0 70% 96%); color: hsl(0 60% 40%); font-size: 12px; }
-        .workflow-delete-hint { position: absolute; bottom: 12px; left: 12px; z-index: 5; opacity: 0.7; }
-        .workflow-retry-btn { color: hsl(38 80% 40%); border-color: hsl(38 60% 60%); }
-        .workflow-palette { position: absolute; top: 56px; right: 16px; z-index: 20; background: hsl(0 0% 100%); border: 1px solid hsl(0 0% 85%); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; box-shadow: 0 6px 20px hsl(0 0% 0% / 0.12); }
-        .workflow-palette-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; border: none; background: transparent; cursor: pointer; font-size: 13px; text-align: left; color: inherit; }
-        .workflow-palette-item:hover { background: hsl(0 0% 94%); }
-        .workflow-palette-empty { font-size: 12px; opacity: 0.6; padding: 6px 10px; max-width: 200px; }
-        .workflow-node { position: relative; display: flex; align-items: center; gap: 8px; background: hsl(0 0% 100%); border: 2px solid; border-radius: 12px; padding: 8px 12px; min-width: 170px; box-shadow: 0 2px 8px hsl(0 0% 0% / 0.08); }
-        .workflow-node-condition { border-color: #f97316; }
-        .workflow-node-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .workflow-node-emoji { font-size: 18px; }
-        .workflow-node-name { font-size: 12px; font-weight: 600; }
-        .workflow-node-model { font-size: 10px; opacity: 0.55; font-family: monospace; }
-        .workflow-node-template { font-size: 9px; opacity: 0.5; margin-top: 2px; }
-        .workflow-node-handle-label { position: absolute; right: -32px; font-size: 9px; opacity: 0.6; }
-        .workflow-node-handle-true { top: 28%; }
-        .workflow-node-handle-false { top: 60%; }
-        .workflow-missing { padding: 40px; text-align: center; }
-        @media (prefers-color-scheme: dark) {
-          .workflow-header { border-color: hsl(0 0% 24%); }
-          .workflow-prompt-input { background: hsl(0 0% 18%); border-color: hsl(0 0% 30%); }
-          .workflow-palette { background: hsl(0 0% 16%); border-color: hsl(0 0% 28%); }
-          .workflow-palette-item:hover { background: hsl(0 0% 24%); }
-          .workflow-node { background: hsl(0 0% 16%); }
-          .workflow-transcript { border-color: hsl(0 0% 24%); }
-          .workflow-transcript-header { border-color: hsl(0 0% 22%); }
-          .workflow-error-banner { background: hsl(0 40% 16%); color: hsl(0 60% 75%); }
-        }
-        :root[data-theme="dark"] .workflow-header { border-color: hsl(0 0% 24%); }
-        :root[data-theme="dark"] .workflow-prompt-input { background: hsl(0 0% 18%); border-color: hsl(0 0% 30%); }
-        :root[data-theme="dark"] .workflow-palette { background: hsl(0 0% 16%); border-color: hsl(0 0% 28%); }
-        :root[data-theme="dark"] .workflow-node { background: hsl(0 0% 16%); }
-        :root[data-theme="dark"] .workflow-transcript { border-color: hsl(0 0% 24%); }
-      `}</style>
     </div>
   );
 }

@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, Trash, Robot, ArrowLeft, FlowArrow, PencilSimple, Warning, DownloadSimple, UploadSimple } from "@phosphor-icons/react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus, Trash, Robot, ArrowLeft, FlowArrow, PencilSimple, Warning,
+  DownloadSimple, UploadSimple, MagnifyingGlass, Globe, BookOpen, Terminal, X,
+} from "@phosphor-icons/react";
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useWorkflows } from "@/hooks/useWorkflows";
 import { useModels } from "@/hooks/useModels";
 import { useSettings } from "@/hooks/useSettings";
 import { getRAGDocuments, setActiveAgentRAGDocumentIds, type RAGDocument } from "@/api";
 import { recordAgentRun, useUsageStats } from "@/hooks/useUsageStats";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 
 const COLORS = [
   { label: "Bleu", value: "#3b82f6" },
@@ -18,6 +25,12 @@ const COLORS = [
 ];
 
 const EMOJIS = ["🤖", "🎓", "📊", "⚖️", "🩺", "💼", "🛠️", "🔬", "✍️", "📚"];
+
+const fieldLabel = "block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1.5 mt-5 first:mt-0";
+const textareaClass =
+  "block w-full rounded-lg border border-zinc-950/10 bg-transparent px-3.5 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:border-white/10 dark:bg-white/5 dark:text-white resize-y font-sans";
+const selectClass =
+  "block w-full rounded-lg border border-zinc-950/10 bg-transparent px-3.5 py-2.5 text-sm text-zinc-950 focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:border-white/10 dark:bg-white/5 dark:text-white";
 
 function AgentForm({ editing, onClose }: { editing?: Agent; onClose: () => void }) {
   const { createAgent, updateAgent } = useAgents();
@@ -47,115 +60,130 @@ function AgentForm({ editing, onClose }: { editing?: Agent; onClose: () => void 
 
   const save = () => {
     const payload = { name: name.trim(), emoji, color, model, systemPrompt, webSearch, rag, ragDocumentIds, taskExecution };
-    if (editing) {
-      updateAgent(editing.id, payload);
-    } else {
-      createAgent(payload);
-    }
+    if (editing) updateAgent(editing.id, payload);
+    else createAgent(payload);
     onClose();
   };
 
   return (
-    <div className="agent-modal-backdrop" onClick={onClose}>
-      <div className="agent-modal" onClick={(e) => e.stopPropagation()}>
-        <h2 className="agent-modal-title">{editing ? "Modifier l'agent" : "Nouvel agent"}</h2>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 12, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+        transition={{ duration: 0.18, ease: [0.165, 0.85, 0.45, 1] }}
+        className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-lg font-bold text-zinc-950 dark:text-white">{editing ? "Modifier l'agent" : "Nouvel agent"}</h2>
+          <button onClick={onClose} className="rounded-full p-1.5 text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200">
+            <X size={16} />
+          </button>
+        </div>
 
-        <label className="agent-form-label">Nom</label>
-        <input
-          className="agent-form-input"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Ex: Expert juridique"
-          autoFocus
-        />
+        <label className={fieldLabel}>Nom</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Expert juridique" autoFocus />
 
-        <label className="agent-form-label">Icône</label>
-        <div className="agent-emoji-picker">
+        <label className={fieldLabel}>Icône</label>
+        <div className="flex flex-wrap gap-1.5">
           {EMOJIS.map((e) => (
             <button
               key={e}
               type="button"
-              className={`agent-emoji-btn ${emoji === e ? "agent-emoji-btn-active" : ""}`}
               onClick={() => setEmoji(e)}
+              className={`flex h-9 w-9 items-center justify-center rounded-lg text-lg transition-colors ${
+                emoji === e ? "bg-blue-500/15 ring-2 ring-blue-500" : "bg-zinc-950/5 hover:bg-zinc-950/10 dark:bg-white/5 dark:hover:bg-white/10"
+              }`}
             >
               {e}
             </button>
           ))}
         </div>
 
-        <label className="agent-form-label">Couleur</label>
-        <div className="agent-color-picker">
+        <label className={fieldLabel}>Couleur</label>
+        <div className="flex gap-2">
           {COLORS.map((c) => (
             <button
               key={c.value}
               type="button"
               title={c.label}
-              className={`agent-color-btn ${color === c.value ? "agent-color-btn-active" : ""}`}
-              style={{ background: c.value }}
               onClick={() => setColor(c.value)}
+              className="h-7 w-7 rounded-full ring-offset-2 ring-offset-white transition-all dark:ring-offset-zinc-900"
+              style={{ background: c.value, boxShadow: color === c.value ? `0 0 0 2px ${c.value}` : "none" }}
             />
           ))}
         </div>
 
-        <label className="agent-form-label">Modèle</label>
-        <select className="agent-form-input" value={model} onChange={(e) => setModel(e.target.value)}>
+        <label className={fieldLabel}>Modèle</label>
+        <select className={selectClass} value={model} onChange={(e) => setModel(e.target.value)}>
           <option value="">Choisir un modèle...</option>
           {models.map((m) => (
             <option key={m.model} value={m.model}>{m.model}</option>
           ))}
         </select>
 
-        <label className="agent-form-label">Instructions (prompt système)</label>
+        <label className={fieldLabel}>Instructions (prompt système)</label>
         <textarea
-          className="agent-form-input agent-form-textarea"
+          className={textareaClass}
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
           placeholder="Décris le rôle, l'expertise et le style de réponse de cet agent..."
-          rows={5}
+          rows={4}
         />
 
-        <label className="agent-form-label">Outils</label>
-        <div className="agent-tools-list">
-          <label className="agent-tool-toggle">
-            <input type="checkbox" checked={webSearch} onChange={(e) => setWebSearch(e.target.checked)} />
-            Recherche web
-          </label>
-          <label className="agent-tool-toggle">
-            <input type="checkbox" checked={rag} onChange={(e) => setRag(e.target.checked)} />
-            Base de connaissances (RAG)
-          </label>
-          <label className="agent-tool-toggle">
-            <input type="checkbox" checked={taskExecution} onChange={(e) => setTaskExecution(e.target.checked)} />
-            Exécution de tâches (commandes, approbation requise à chaque appel)
-          </label>
+        <label className={fieldLabel}>Outils</label>
+        <div className="space-y-2">
+          <ToolToggle icon={<Globe size={16} />} label="Recherche web" checked={webSearch} onChange={setWebSearch} />
+          <ToolToggle icon={<BookOpen size={16} />} label="Base de connaissances (RAG)" checked={rag} onChange={setRag} />
+          <ToolToggle icon={<Terminal size={16} />} label="Exécution de tâches" sublabel="commandes, approbation requise à chaque appel" checked={taskExecution} onChange={setTaskExecution} />
         </div>
 
-        {rag && (
-          <>
-            <label className="agent-form-label">Documents RAG (aucun coché = toute la base)</label>
-            {ragDocs.length === 0 ? (
-              <div className="agent-rag-empty">Aucun document dans la base de connaissances.</div>
-            ) : (
-              <div className="agent-rag-doc-list">
-                {ragDocs.map((d) => (
-                  <label key={d.id} className="agent-tool-toggle">
-                    <input type="checkbox" checked={ragDocumentIds.includes(d.id)} onChange={() => toggleDoc(d.id)} />
-                    {d.filename}
-                  </label>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+        <AnimatePresence>
+          {rag && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+              <label className={fieldLabel}>Documents RAG (aucun coché = toute la base)</label>
+              {ragDocs.length === 0 ? (
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">Aucun document dans la base de connaissances.</div>
+              ) : (
+                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto rounded-lg bg-zinc-950/5 p-2 dark:bg-white/5">
+                  {ragDocs.map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                      <input type="checkbox" checked={ragDocumentIds.includes(d.id)} onChange={() => toggleDoc(d.id)} className="rounded" />
+                      {d.filename}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        <div className="agent-modal-actions">
-          <button type="button" className="agent-btn-secondary" onClick={onClose}>Annuler</button>
-          <button type="button" className="agent-btn-primary" disabled={!canSave} onClick={save}>
-            {editing ? "Enregistrer" : "Créer l'agent"}
-          </button>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button plain onClick={onClose}>Annuler</Button>
+          <Button color="blue" disabled={!canSave} onClick={save}>{editing ? "Enregistrer" : "Créer l'agent"}</Button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function ToolToggle({ icon, label, sublabel, checked, onChange }: { icon: React.ReactNode; label: string; sublabel?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-2.5 rounded-lg border border-zinc-950/10 p-2.5 cursor-pointer hover:bg-zinc-950/2.5 dark:border-white/10 dark:hover:bg-white/5">
+      <span className="mt-0.5 text-zinc-500 dark:text-zinc-400">{icon}</span>
+      <span className="flex-1">
+        <span className="block text-sm text-zinc-800 dark:text-zinc-200">{label}</span>
+        {sublabel && <span className="block text-xs text-zinc-500 dark:text-zinc-400">{sublabel}</span>}
+      </span>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-1 rounded" />
+    </label>
   );
 }
 
@@ -167,27 +195,64 @@ function AgentCard({ agent, modelMissing, onLaunch, onEdit, onDelete }: {
   onDelete: (id: string, name: string) => void;
 }) {
   return (
-    <div className="agent-card" style={{ borderTopColor: agent.color }} onClick={() => onLaunch(agent)}>
-      <div className="agent-card-actions">
-        <button className="agent-card-icon-btn" onClick={(e) => { e.stopPropagation(); onEdit(agent); }} title="Modifier">
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.15 }}
+      className="group relative cursor-pointer rounded-2xl border border-zinc-950/8 bg-white p-4 shadow-sm hover:shadow-lg dark:border-white/10 dark:bg-zinc-800/60"
+      style={{ borderTopWidth: 3, borderTopColor: agent.color }}
+      onClick={() => onLaunch(agent)}
+    >
+      <div className="absolute right-2.5 top-2.5 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button onClick={(e) => { e.stopPropagation(); onEdit(agent); }} title="Modifier" className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200">
           <PencilSimple size={14} />
         </button>
-        <button className="agent-card-icon-btn agent-card-icon-btn-danger" onClick={(e) => { e.stopPropagation(); onDelete(agent.id, agent.name); }} title="Supprimer">
+        <button onClick={(e) => { e.stopPropagation(); onDelete(agent.id, agent.name); }} title="Supprimer" className="rounded-md p-1.5 text-red-400 hover:bg-red-500/10 hover:text-red-600">
           <Trash size={14} />
         </button>
       </div>
-      <div className="agent-card-emoji" style={{ background: `${agent.color}22` }}>{agent.emoji}</div>
-      <div className="agent-card-name">
+
+      <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl text-xl" style={{ background: `${agent.color}1f` }}>
+        {agent.emoji}
+      </div>
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
         {agent.name}
-        {modelMissing && <Warning size={13} className="agent-card-warning" />}
+        {modelMissing && <Warning size={13} className="text-amber-500" />}
       </div>
-      <div className="agent-card-model">{modelMissing ? `${agent.model} (introuvable)` : agent.model}</div>
-      {agent.systemPrompt && <div className="agent-card-desc">{agent.systemPrompt}</div>}
-      <div className="agent-card-tools">
-        {agent.webSearch && <span className="agent-card-tag">Recherche web</span>}
-        {agent.rag && <span className="agent-card-tag">RAG{agent.ragDocumentIds?.length ? ` (${agent.ragDocumentIds.length})` : ""}</span>}
-        {agent.taskExecution && <span className="agent-card-tag">Tâches</span>}
+      <div className="mb-2 truncate font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+        {modelMissing ? `${agent.model} (introuvable)` : agent.model}
       </div>
+      {agent.systemPrompt && (
+        <div className="mb-2 line-clamp-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{agent.systemPrompt}</div>
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {agent.webSearch && <Badge color="blue">Recherche web</Badge>}
+        {agent.rag && <Badge color="purple">RAG{agent.ragDocumentIds?.length ? ` (${agent.ragDocumentIds.length})` : ""}</Badge>}
+        {agent.taskExecution && <Badge color="orange">Tâches</Badge>}
+      </div>
+    </motion.div>
+  );
+}
+
+function SectionHeader({ icon, title, action }: { icon: React.ReactNode; title: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-4 mt-8 flex items-center gap-2 first:mt-0">
+      <span className="text-zinc-400 dark:text-zinc-500">{icon}</span>
+      <h2 className="flex-1 text-base font-bold text-zinc-900 dark:text-zinc-100">{title}</h2>
+      {action}
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title?: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-zinc-950/10 py-14 px-6 text-center dark:border-white/10">
+      <span className="text-zinc-300 dark:text-zinc-600">{icon}</span>
+      {title && <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">{title}</p>}
+      <p className="max-w-sm text-xs text-zinc-500 dark:text-zinc-400">{sub}</p>
     </div>
   );
 }
@@ -201,8 +266,12 @@ export default function AgentsGallery() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | undefined>(undefined);
+  const [search, setSearch] = useState("");
 
   const knownModelNames = new Set(models.map((m) => m.model.split(":")[0]));
+  const filteredAgents = search.trim()
+    ? agents.filter((a) => a.name.toLowerCase().includes(search.toLowerCase()) || a.model.toLowerCase().includes(search.toLowerCase()))
+    : agents;
 
   const launchAgent = async (agent: Agent) => {
     setActiveAgentRAGDocumentIds(agent.rag ? agent.ragDocumentIds ?? [] : []);
@@ -253,15 +322,9 @@ export default function AgentsGallery() {
         for (const a of parsed) {
           if (a.name && a.model) {
             createAgent({
-              name: a.name,
-              emoji: a.emoji ?? EMOJIS[0],
-              color: a.color ?? COLORS[0].value,
-              model: a.model,
-              systemPrompt: a.systemPrompt ?? "",
-              webSearch: a.webSearch ?? false,
-              rag: a.rag ?? false,
-              ragDocumentIds: a.ragDocumentIds ?? [],
-              taskExecution: a.taskExecution ?? false,
+              name: a.name, emoji: a.emoji ?? EMOJIS[0], color: a.color ?? COLORS[0].value, model: a.model,
+              systemPrompt: a.systemPrompt ?? "", webSearch: a.webSearch ?? false, rag: a.rag ?? false,
+              ragDocumentIds: a.ragDocumentIds ?? [], taskExecution: a.taskExecution ?? false,
             });
             imported++;
           }
@@ -275,185 +338,112 @@ export default function AgentsGallery() {
   };
 
   return (
-    <div className="agents-page">
-      <div className="agents-header">
-        <button className="agents-back" onClick={() => navigate({ to: "/" })}>
+    <div className="mx-auto max-w-4xl px-6 py-6 sm:px-8">
+      <div className="mb-6 flex items-center gap-3">
+        <button onClick={() => navigate({ to: "/" })} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-950/5 dark:text-zinc-400 dark:hover:bg-white/10">
           <ArrowLeft size={16} />
         </button>
-        <Robot size={20} />
-        <h1 className="agents-title">Agents</h1>
-        <button className="agent-btn-secondary" onClick={exportAgents} title="Exporter les agents en JSON">
-          <DownloadSimple size={14} />
-        </button>
-        <button className="agent-btn-secondary" onClick={importAgents} title="Importer des agents depuis un JSON">
-          <UploadSimple size={14} />
-        </button>
-        <button className="agent-btn-primary agents-new-btn" onClick={() => { setEditingAgent(undefined); setShowForm(true); }}>
-          <Plus size={14} weight="bold" />
-          Nouvel agent
-        </button>
+        <Robot size={20} className="text-zinc-400 dark:text-zinc-500" />
+        <h1 className="flex-1 text-xl font-bold text-zinc-950 dark:text-white">Agents</h1>
+        <Button plain onClick={exportAgents} title="Exporter les agents"><DownloadSimple size={15} /></Button>
+        <Button plain onClick={importAgents} title="Importer des agents"><UploadSimple size={15} /></Button>
+        <Button color="blue" onClick={() => { setEditingAgent(undefined); setShowForm(true); }}>
+          <Plus size={14} weight="bold" /> Nouvel agent
+        </Button>
       </div>
 
-      {agents.length === 0 ? (
-        <div className="agents-empty">
-          <Robot size={40} />
-          <p>Aucun agent pour l'instant.</p>
-          <p className="agents-empty-sub">Crée un agent avec un modèle, des instructions et des outils dédiés, puis lance une conversation pré-configurée en un clic.</p>
-        </div>
-      ) : (
-        <div className="agents-grid">
-          {agents.map((a) => (
-            <AgentCard
-              key={a.id}
-              agent={a}
-              modelMissing={models.length > 0 && !knownModelNames.has(a.model.split(":")[0])}
-              onLaunch={launchAgent}
-              onEdit={(agent) => { setEditingAgent(agent); setShowForm(true); }}
-              onDelete={confirmDeleteAgent}
-            />
-          ))}
+      {agents.length > 3 && (
+        <div className="mb-4">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un agent..."
+          />
         </div>
       )}
 
-      <div className="agents-section-header">
-        <FlowArrow size={18} />
-        <h2 className="agents-section-title">Workflows</h2>
-        <button className="agent-btn-secondary agents-new-btn" onClick={newWorkflow}>
-          <Plus size={14} weight="bold" />
-          Nouveau workflow
-        </button>
-      </div>
+      {agents.length === 0 ? (
+        <EmptyState icon={<Robot size={40} />} title="Aucun agent pour l'instant" sub="Crée un agent avec un modèle, des instructions et des outils dédiés, puis lance une conversation pré-configurée en un clic." />
+      ) : (
+        <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <AnimatePresence mode="popLayout">
+            {filteredAgents.map((a) => (
+              <AgentCard
+                key={a.id}
+                agent={a}
+                modelMissing={models.length > 0 && !knownModelNames.has(a.model.split(":")[0])}
+                onLaunch={launchAgent}
+                onEdit={(agent) => { setEditingAgent(agent); setShowForm(true); }}
+                onDelete={confirmDeleteAgent}
+              />
+            ))}
+          </AnimatePresence>
+        </motion.div>
+      )}
+      {agents.length > 3 && filteredAgents.length === 0 && (
+        <EmptyState icon={<MagnifyingGlass size={32} />} sub={`Aucun agent ne correspond à "${search}".`} />
+      )}
+
+      <SectionHeader
+        icon={<FlowArrow size={18} />}
+        title="Workflows"
+        action={<Button outline onClick={newWorkflow}><Plus size={14} weight="bold" /> Nouveau workflow</Button>}
+      />
 
       {workflows.length === 0 ? (
-        <div className="agents-empty">
-          <FlowArrow size={32} />
-          <p className="agents-empty-sub">Enchaîne plusieurs agents dans un canevas visuel : la sortie de l'un devient l'entrée du suivant.</p>
-        </div>
+        <EmptyState icon={<FlowArrow size={32} />} sub="Enchaîne plusieurs agents dans un canevas visuel : la sortie de l'un devient l'entrée du suivant." />
       ) : (
-        <div className="agents-grid">
-          {workflows.map((w) => (
-            <div
-              key={w.id}
-              className="agent-card workflow-card"
-              onClick={() => navigate({ to: "/workflows/$workflowId", params: { workflowId: w.id } })}
-            >
-              <div className="agent-card-actions">
+        <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <AnimatePresence mode="popLayout">
+            {workflows.map((w) => (
+              <motion.div
+                layout
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                whileHover={{ y: -3 }}
+                key={w.id}
+                className="group relative cursor-pointer rounded-2xl border border-zinc-950/8 bg-white p-4 shadow-sm hover:shadow-lg dark:border-white/10 dark:bg-zinc-800/60"
+                onClick={() => navigate({ to: "/workflows/$workflowId", params: { workflowId: w.id } })}
+              >
                 <button
-                  className="agent-card-icon-btn agent-card-icon-btn-danger"
                   onClick={(e) => { e.stopPropagation(); confirmDeleteWorkflow(w.id, w.name); }}
+                  className="absolute right-2.5 top-2.5 rounded-md p-1.5 text-red-400 opacity-0 transition-opacity hover:bg-red-500/10 hover:text-red-600 group-hover:opacity-100"
                   title="Supprimer le workflow"
                 >
                   <Trash size={14} />
                 </button>
-              </div>
-              <div className="agent-card-emoji">🔀</div>
-              <div className="agent-card-name">{w.name}</div>
-              <div className="agent-card-model">
-                {w.nodes.length} étape(s)
-                {stats.workflows[w.id] ? ` · ${stats.workflows[w.id].runs} lancement(s)` : ""}
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/15 text-xl">🔀</div>
+                <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{w.name}</div>
+                <div className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+                  {w.nodes.length} étape(s){stats.workflows[w.id] ? ` · ${stats.workflows[w.id].runs} lancement(s)` : ""}
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </motion.div>
       )}
 
       {(agents.length > 0 || workflows.length > 0) && (
-        <div className="agents-section-header">
-          <h2 className="agents-section-title">Utilisation</h2>
-        </div>
-      )}
-      {agents.length > 0 && (
-        <div className="agents-stats-list">
-          {agents.map((a) => (
-            <div key={a.id} className="agents-stats-row">
-              <span>{a.emoji} {a.name}</span>
-              <span className="agents-stats-value">
-                {stats.agents[a.id]?.runs ?? 0} lancement(s)
-                {stats.agents[a.id]?.lastRun ? ` · dernier : ${new Date(stats.agents[a.id].lastRun).toLocaleString("fr-FR")}` : ""}
-              </span>
-            </div>
-          ))}
-        </div>
+        <>
+          <SectionHeader icon={undefined} title="Utilisation" />
+          <div className="flex flex-col gap-1">
+            {agents.map((a) => (
+              <div key={a.id} className="flex items-center justify-between rounded-lg bg-zinc-950/3 px-3 py-2 text-xs dark:bg-white/5">
+                <span className="text-zinc-700 dark:text-zinc-300">{a.emoji} {a.name}</span>
+                <span className="text-zinc-500 dark:text-zinc-400">
+                  {stats.agents[a.id]?.runs ?? 0} lancement(s)
+                  {stats.agents[a.id]?.lastRun ? ` · dernier : ${new Date(stats.agents[a.id].lastRun).toLocaleString("fr-FR")}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
-      {showForm && <AgentForm editing={editingAgent} onClose={() => setShowForm(false)} />}
-
-      <style>{`
-        .agents-section-header { display: flex; align-items: center; gap: 10px; margin: 32px 0 16px; }
-        .agents-section-title { font-size: 16px; font-weight: 700; flex: 1; }
-        .agents-page { padding: 24px 32px; max-width: 960px; margin: 0 auto; }
-        .agents-header { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
-        .agents-back { background: transparent; border: none; cursor: pointer; padding: 6px; border-radius: 8px; color: inherit; opacity: 0.7; }
-        .agents-back:hover { opacity: 1; background: hsl(0 0% 90%); }
-        .agents-title { font-size: 20px; font-weight: 700; flex: 1; }
-        .agents-new-btn { margin-left: 4px; }
-        .agents-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 64px 16px; opacity: 0.6; text-align: center; }
-        .agents-empty-sub { font-size: 13px; max-width: 360px; }
-        .agents-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-        .agents-stats-list { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-        .agents-stats-row { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 8px; background: hsl(0 0% 96%); }
-        .agents-stats-value { opacity: 0.6; }
-        .agent-card {
-          position: relative;
-          border: 1px solid hsl(0 0% 88%);
-          border-top: 3px solid;
-          border-radius: 14px;
-          padding: 16px;
-          cursor: pointer;
-          background: hsl(0 0% 100%);
-          transition: transform 120ms, box-shadow 120ms;
-        }
-        .agent-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px hsl(0 0% 0% / 0.08); }
-        .agent-card-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; opacity: 0; transition: opacity 120ms; }
-        .agent-card:hover .agent-card-actions { opacity: 0.8; }
-        .agent-card-icon-btn { background: transparent; border: none; cursor: pointer; padding: 4px; border-radius: 6px; color: hsl(0 0% 40%); }
-        .agent-card-icon-btn:hover { opacity: 1 !important; background: hsl(0 0% 90%); }
-        .agent-card-icon-btn-danger { color: hsl(0 60% 50%); }
-        .agent-card-icon-btn-danger:hover { background: hsl(0 60% 95%); }
-        .agent-card-warning { color: hsl(38 90% 50%); margin-left: 4px; vertical-align: middle; }
-        .agent-card-emoji { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; margin-bottom: 10px; }
-        .agent-card-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
-        .agent-card-model { font-size: 11px; opacity: 0.5; font-family: monospace; margin-bottom: 8px; }
-        .agent-card-desc { font-size: 12px; opacity: 0.7; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
-        .agent-card-tools { display: flex; gap: 6px; flex-wrap: wrap; }
-        .agent-card-tag { font-size: 10px; padding: 2px 8px; border-radius: 9999px; background: hsl(0 0% 94%); opacity: 0.8; }
-
-        .agent-modal-backdrop { position: fixed; inset: 0; background: hsl(0 0% 0% / 0.4); z-index: 100; display: flex; align-items: center; justify-content: center; }
-        .agent-modal { background: hsl(0 0% 100%); border-radius: 16px; padding: 24px; width: 460px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
-        .agent-modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
-        .agent-form-label { display: block; font-size: 12px; font-weight: 600; opacity: 0.7; margin: 14px 0 6px; }
-        .agent-form-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid hsl(0 0% 85%); font-size: 13px; background: hsl(0 0% 100%); color: inherit; }
-        .agent-form-textarea { resize: vertical; font-family: inherit; }
-        .agent-emoji-picker { display: flex; gap: 6px; flex-wrap: wrap; }
-        .agent-emoji-btn { font-size: 18px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: hsl(0 0% 95%); cursor: pointer; }
-        .agent-emoji-btn-active { border-color: hsl(217 70% 55%); background: hsl(217 70% 95%); }
-        .agent-color-picker { display: flex; gap: 8px; }
-        .agent-color-btn { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
-        .agent-color-btn-active { border-color: hsl(0 0% 20%); }
-        .agent-tools-list { display: flex; flex-direction: column; gap: 6px; }
-        .agent-tool-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
-        .agent-rag-doc-list { display: flex; flex-direction: column; gap: 4px; max-height: 140px; overflow-y: auto; padding: 8px; border-radius: 8px; background: hsl(0 0% 96%); }
-        .agent-rag-empty { font-size: 12px; opacity: 0.6; }
-        .agent-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
-        .agent-btn-primary { display: flex; align-items: center; gap: 6px; background: hsl(217 70% 55%); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-        .agent-btn-primary:disabled { opacity: 0.4; cursor: default; }
-        .agent-btn-secondary { display: flex; align-items: center; gap: 6px; background: transparent; border: 1px solid hsl(0 0% 80%); padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; color: inherit; }
-
-        @media (prefers-color-scheme: dark) {
-          .agent-card { background: hsl(0 0% 14%); border-color: hsl(0 0% 24%); }
-          .agent-card-tag { background: hsl(0 0% 22%); }
-          .agents-stats-row { background: hsl(0 0% 18%); }
-          .agent-rag-doc-list { background: hsl(0 0% 20%); }
-          .agent-modal { background: hsl(0 0% 16%); }
-          .agent-form-input { background: hsl(0 0% 20%); border-color: hsl(0 0% 30%); }
-          .agent-emoji-btn { background: hsl(0 0% 22%); }
-          .agents-back:hover { background: hsl(0 0% 22%); }
-          .agent-card-icon-btn:hover { background: hsl(0 0% 26%); }
-        }
-        :root[data-theme="dark"] .agent-card { background: hsl(0 0% 14%); border-color: hsl(0 0% 24%); }
-        :root[data-theme="dark"] .agent-modal { background: hsl(0 0% 16%); }
-        :root[data-theme="dark"] .agent-form-input { background: hsl(0 0% 20%); border-color: hsl(0 0% 30%); }
-      `}</style>
+      <AnimatePresence>
+        {showForm && <AgentForm key="agent-form" editing={editingAgent} onClose={() => setShowForm(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
