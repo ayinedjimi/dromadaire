@@ -271,16 +271,46 @@ function EmptyState({ icon, title, sub }: { icon: React.ReactNode; title?: strin
   );
 }
 
+const SEEDED_FLAG = "dromadaire-agents-seeded";
+
 export default function AgentsGallery() {
   const { agents, createAgent, deleteAgent } = useAgents();
   const { workflows, createWorkflow, deleteWorkflow } = useWorkflows();
-  const { setSettings } = useSettings();
+  const { settings, setSettings } = useSettings();
   const { data: models = [] } = useModels();
   const stats = useUsageStats();
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | undefined>(undefined);
   const [search, setSearch] = useState("");
+
+  // Seed a starter agent once, on first-ever use — not re-added if the user
+  // later deletes it (gated by a separate flag, not agents.length === 0)
+  useEffect(() => {
+    if (localStorage.getItem(SEEDED_FLAG)) return;
+    localStorage.setItem(SEEDED_FLAG, "1");
+    if (agents.length > 0 || !settings.selectedModel) return;
+    createAgent({
+      name: "Comparateur de produits",
+      emoji: "🛒",
+      color: "#f97316",
+      model: settings.selectedModel,
+      systemPrompt:
+        "Tu es un expert en recherche et comparaison de produits (électronique, électroménager, informatique...). " +
+        "Utilise systématiquement la recherche web pour trouver des informations à jour — ne te fie jamais à ta seule mémoire pour les prix ou les modèles récents.\n\n" +
+        "Méthode :\n" +
+        "1. Si le budget, l'usage principal (ex: bureautique, gaming, montage vidéo) ou les contraintes (poids, autonomie, taille d'écran) ne sont pas précisés, pose 1-2 questions ciblées avant de chercher.\n" +
+        "2. Cherche sur plusieurs sources (tests indépendants, comparatifs, avis utilisateurs, prix actuels) plutôt qu'une seule.\n" +
+        "3. Présente les résultats sous forme de tableau comparatif (modèle, prix, points forts, points faibles).\n" +
+        "4. Termine toujours par une recommandation claire et justifiée, adaptée au besoin exprimé — pas juste une liste neutre.\n" +
+        "5. Précise la date des prix trouvés (ils évoluent vite) et cite tes sources.\n" +
+        "6. Reste objectif : pas de biais de marque, signale les compromis (ex: \"moins cher mais autonomie plus faible\").",
+      webSearch: true,
+      rag: false,
+      ragDocumentIds: [],
+      taskExecution: false,
+    });
+  }, [agents.length, settings.selectedModel, createAgent]);
 
   const knownModelNames = new Set(models.map((m) => m.model.split(":")[0]));
   const filteredAgents = search.trim()
