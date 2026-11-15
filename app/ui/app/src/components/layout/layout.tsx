@@ -4,7 +4,7 @@ import { useIncognito } from "@/contexts/IncognitoContext";
 import { useFolder } from "@/contexts/FolderContext";
 import { ModelBar } from "@/components/ModelBar";
 import { ProjectTabs } from "@/components/ProjectTabs";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { activateTamagotchi } from "@/components/TamagotchiCompanion";
 
 // hidden easter egg: click the "Dromadaire" version badge this many times

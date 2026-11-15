@@ -3,11 +3,26 @@ import { Model } from "@/gotypes";
 import type { Agent } from "@/hooks/useAgents";
 import type { Workflow, WorkflowNodeData } from "@/hooks/useWorkflows";
 
-export type NodeStatus = "idle" | "running" | "done" | "error" | "skipped";
+export type NodeStatus = "idle" | "loading" | "running" | "done" | "error" | "skipped";
 
 export interface WorkflowRunCallbacks {
   onNodeStatus: (nodeId: string, status: NodeStatus, output?: string) => void;
   onNodeDelta?: (nodeId: string, deltaText: string) => void;
+}
+
+// Translates raw backend/network error strings into actionable French messages
+// for the transcript panel. Falls back to the raw message when unrecognized.
+function friendlyErrorMessage(raw: string): string {
+  switch (raw) {
+    case "empty message":
+      return "Message vide envoyé à l'agent — ce nœud n'a reçu aucun texte. Vérifie le \"Message initial du workflow\" en haut (pour le premier nœud) ou le template/la sortie du nœud précédent.";
+    case "empty model":
+      return "Aucun modèle sélectionné pour cet agent — vérifie sa configuration.";
+    case "Token is required":
+      return "Session non authentifiée — recharge la page de l'application.";
+    default:
+      return raw;
+  }
 }
 
 function buildGraph(workflow: Workflow) {
@@ -68,18 +83,20 @@ async function runAgentStep(
   agent: Agent,
   input: string,
   nodeId: string,
-  onDelta?: (nodeId: string, deltaText: string) => void,
+  callbacks: WorkflowRunCallbacks,
+  signal?: AbortSignal,
 ): Promise<{ chatId: string; text: string }> {
   const model = new Model({ model: agent.model });
   let chatId = "new";
   let text = "";
+  let generating = false;
 
   for await (const event of sendMessage(
     "new",
     input,
     model,
     undefined,
-    undefined,
+    signal,
     undefined,
     agent.webSearch,
     false,
@@ -89,9 +106,20 @@ async function runAgentStep(
   )) {
     if (event.eventName === "chat_created" && event.chatId) {
       chatId = event.chatId;
+    } else if (event.eventName === "loading") {
+      // Backend sends this right before loading the model into RAM — can take
+      // seconds to minutes on CPU. Distinct from "running" so the UI can show
+      // "chargement du modèle" instead of implying generation has started.
+      callbacks.onNodeStatus(nodeId, "loading");
     } else if (event.eventName === "chat" && event.content) {
+      if (!generating) {
+        generating = true;
+        // First real token — model is loaded and generating, switch the dot
+        // back from "loading" (a no-op if it never left "running").
+        callbacks.onNodeStatus(nodeId, "running");
+      }
       text += event.content;
-      onDelta?.(nodeId, event.content);
+      callbacks.onNodeDelta?.(nodeId, event.content);
     }
   }
 
@@ -102,6 +130,9 @@ export interface RunWorkflowOptions {
   // W5: resume a previous run — skip these nodes and use their recorded outputs
   seedOutputs?: Map<string, string>;
   skipNodeIds?: Set<string>;
+  // Stop the whole run: aborts the in-flight step and skips picking up any
+  // further node once the current one settles.
+  signal?: AbortSignal;
 }
 
 // Executes a workflow's DAG: nodes with no predecessors receive `initialPrompt`,
@@ -144,6 +175,7 @@ export async function runWorkflow(
   };
 
   while (ready.length > 0) {
+    if (options.signal?.aborted) break;
     const nodeId = ready.shift()!;
     if (skip.has(nodeId)) {
       propagate(nodeId);
@@ -165,7 +197,7 @@ export async function runWorkflow(
 
     const agent = node ? agentsById.get(node.agentId) : undefined;
     if (!agent) {
-      callbacks.onNodeStatus(nodeId, "error");
+      callbacks.onNodeStatus(nodeId, "error", "Agent introuvable — a-t-il été supprimé ?");
       done.add(nodeId);
       propagate(nodeId);
       continue;
@@ -187,11 +219,14 @@ export async function runWorkflow(
         RAGEnabled: agent.rag,
         Agent: agent.taskExecution,
       });
-      const { text } = await runAgentStep(agent, input, nodeId, callbacks.onNodeDelta);
+      const { text } = await runAgentStep(agent, input, nodeId, callbacks, options.signal);
       outputs.set(nodeId, text);
       callbacks.onNodeStatus(nodeId, "done", text);
-    } catch {
-      callbacks.onNodeStatus(nodeId, "error");
+    } catch (err) {
+      const message = err instanceof Error && err.name === "AbortError"
+        ? "Arrêté par l'utilisateur."
+        : friendlyErrorMessage(err instanceof Error ? err.message : String(err));
+      callbacks.onNodeStatus(nodeId, "error", message);
     }
     done.add(nodeId);
     propagate(nodeId);

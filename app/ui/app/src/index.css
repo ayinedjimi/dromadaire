@@ -275,6 +275,18 @@ html, body {
   height: 16px !important;
 }
 
+/* Workflow canvas: indeterminate progress bar for "loading model into RAM" —
+   the backend sends a bare "loading" event with no percentage, so this
+   communicates "something is happening" rather than a fake completion %. */
+@keyframes indeterminate-bar {
+  0% { transform: translateX(-100%) scaleX(0.4); }
+  50% { transform: translateX(20%) scaleX(0.6); }
+  100% { transform: translateX(100%) scaleX(0.4); }
+}
+.animate-indeterminate-bar {
+  animation: indeterminate-bar 1.4s ease-in-out infinite;
+}
+
 /* 5. Textarea focus glow */
 @keyframes focus-glow {
   from { box-shadow: 0 0 0 3px hsl(var(--accent-000) / 25%); }

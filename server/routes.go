@@ -2636,7 +2636,14 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 	}
 
-	r, m, opts, err := s.scheduleRunner(c.Request.Context(), name.String(), caps, req.Options, req.KeepAlive, req.Shift)
+	// lamazero/ models run on the CPU engine and bypass the GPU scheduler.
+	var r llm.LlamaServer
+	var opts *api.Options
+	if isLamazeroName(name) {
+		r, opts, err = s.lamazeroRunnerFor(name, m, req.Options)
+	} else {
+		r, m, opts, err = s.scheduleRunner(c.Request.Context(), name.String(), caps, req.Options, req.KeepAlive, req.Shift)
+	}
 	if errors.Is(err, errCapabilityCompletion) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("%q does not support chat", req.Model)})
 		return
@@ -2676,7 +2683,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 		}
 	}
 
-	if chatModeForModel(m) == chatExecutionModeNative {
+	if !isLamazeroName(name) && chatModeForModel(m) == chatExecutionModeNative {
 		s.handleNativeChat(c, req, m, r, opts, msgs, checkpointStart, checkpointLoaded)
 		return
 	}
@@ -2698,7 +2705,7 @@ func (s *Server) ChatHandler(c *gin.Context) {
 	}
 
 	truncate := req.Truncate == nil || *req.Truncate
-	if m.IsMLX() {
+	if m.IsMLX() || isLamazeroName(name) {
 		truncate = false
 	}
 	promptOpts := optionsForPrompt(opts, r)

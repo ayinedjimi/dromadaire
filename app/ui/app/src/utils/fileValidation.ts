@@ -110,7 +110,7 @@ export function readFileAsBytes(file: File): Promise<Uint8Array> {
 
 function resizeImageIfNeeded(data: Uint8Array, mimeType: string, maxDim: number = 1024): Promise<Uint8Array> {
   return new Promise((resolve) => {
-    const blob = new Blob([data], { type: mimeType || 'image/jpeg' });
+    const blob = new Blob([new Uint8Array(data)], { type: mimeType || 'image/jpeg' });
     const url = URL.createObjectURL(blob);
 
     const img = new Image();

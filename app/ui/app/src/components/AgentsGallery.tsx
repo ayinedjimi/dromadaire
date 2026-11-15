@@ -3,7 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Trash, Robot, ArrowLeft, FlowArrow, PencilSimple, Warning,
-  DownloadSimple, UploadSimple, MagnifyingGlass, Globe, BookOpen, Terminal, X,
+  DownloadSimple, UploadSimple, MagnifyingGlass, Globe, BookOpen, Terminal, X, TestTube,
 } from "@phosphor-icons/react";
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useWorkflows } from "@/hooks/useWorkflows";
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { showToast } from "@/components/Toast";
+import { TestAgentModal } from "@/components/TestAgentModal";
 
 const COLORS = [
   { label: "Bleu", value: "#3b82f6" },
@@ -202,10 +203,11 @@ function ToolToggle({ icon, label, sublabel, checked, onChange }: { icon: React.
   );
 }
 
-function AgentCard({ agent, modelMissing, onLaunch, onEdit, onDelete }: {
+function AgentCard({ agent, modelMissing, onLaunch, onTest, onEdit, onDelete }: {
   agent: Agent;
   modelMissing: boolean;
   onLaunch: (a: Agent) => void;
+  onTest: (a: Agent) => void;
   onEdit: (a: Agent) => void;
   onDelete: (id: string, name: string) => void;
 }) {
@@ -222,6 +224,9 @@ function AgentCard({ agent, modelMissing, onLaunch, onEdit, onDelete }: {
       onClick={() => onLaunch(agent)}
     >
       <div className="absolute right-2.5 top-2.5 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <button onClick={(e) => { e.stopPropagation(); onTest(agent); }} title="Tester (sans quitter cette page)" className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200">
+          <TestTube size={14} />
+        </button>
         <button onClick={(e) => { e.stopPropagation(); onEdit(agent); }} title="Modifier" className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-950/5 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200">
           <PencilSimple size={14} />
         </button>
@@ -283,6 +288,7 @@ export default function AgentsGallery() {
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [editingAgent, setEditingAgent] = useState<Agent | undefined>(undefined);
+  const [testingAgent, setTestingAgent] = useState<Agent | undefined>(undefined);
   const [search, setSearch] = useState("");
 
   // Seed a starter agent once, on first-ever use — not re-added if the user
@@ -291,11 +297,16 @@ export default function AgentsGallery() {
     if (localStorage.getItem(SEEDED_FLAG)) return;
     localStorage.setItem(SEEDED_FLAG, "1");
     if (agents.length > 0 || !settings.selectedModel) return;
+    // Prefer a model that reliably follows structured multi-step instructions
+    // (agentic use, not just chat) — fall back to whatever's selected if it's
+    // not installed.
+    const PREFERRED_AGENT_MODEL = "qwen3:8b";
+    const agentModel = models.some((m) => m.model === PREFERRED_AGENT_MODEL) ? PREFERRED_AGENT_MODEL : settings.selectedModel;
     createAgent({
       name: "Comparateur de produits",
       emoji: "🛒",
       color: "#f97316",
-      model: settings.selectedModel,
+      model: agentModel,
       systemPrompt:
         "Tu es un expert en recherche et comparaison de produits (électronique, électroménager, informatique...). " +
         "Utilise systématiquement la recherche web pour trouver des informations à jour — ne te fie jamais à ta seule mémoire pour les prix ou les modèles récents.\n\n" +
@@ -311,7 +322,7 @@ export default function AgentsGallery() {
       ragDocumentIds: [],
       taskExecution: false,
     });
-  }, [agents.length, settings.selectedModel, createAgent]);
+  }, [agents.length, settings.selectedModel, models, createAgent]);
 
   const knownModelNames = new Set(models.map((m) => m.model.split(":")[0]));
   const filteredAgents = search.trim()
@@ -419,6 +430,7 @@ export default function AgentsGallery() {
                 agent={a}
                 modelMissing={models.length > 0 && !knownModelNames.has(a.model.split(":")[0])}
                 onLaunch={launchAgent}
+                onTest={setTestingAgent}
                 onEdit={(agent) => { setEditingAgent(agent); setShowForm(true); }}
                 onDelete={confirmDeleteAgent}
               />
@@ -489,6 +501,7 @@ export default function AgentsGallery() {
 
       <AnimatePresence>
         {showForm && <AgentForm key="agent-form" editing={editingAgent} onClose={() => setShowForm(false)} />}
+        {testingAgent && <TestAgentModal key={testingAgent.id} agent={testingAgent} onClose={() => setTestingAgent(undefined)} />}
       </AnimatePresence>
     </div>
   );

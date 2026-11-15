@@ -17,7 +17,7 @@ interface ModelBarProps {
 
 export function ModelBar({ chatId }: ModelBarProps) {
   const { selectedModel, setSettings, models, loading } = useSelectedModel(chatId);
-  const { settings } = useSettings();
+  const { settings, settingsData } = useSettings();
   const { isHealthy } = useHealth();
   const { isGPU, gpuName } = useInferenceCompute();
   const isStreaming = useIsStreaming(chatId || "new");
@@ -60,13 +60,13 @@ export function ModelBar({ chatId }: ModelBarProps) {
           } catch {}
         }
         const opts: Record<string, unknown> = { use_mmap: false };
-        if (settings.ContextLength > 0) opts.num_ctx = settings.ContextLength;
-        if (settings.NumThread > 0) opts.num_thread = settings.NumThread;
-        if (settings.NumBatch > 0) opts.num_batch = settings.NumBatch;
-        if (settings.UseMlock) opts.use_mlock = true;
-        if (settings.KVCacheType) {
-          opts.cache_type_k = settings.KVCacheType;
-          opts.cache_type_v = settings.KVCacheType;
+        if ((settingsData?.ContextLength ?? 0) > 0) opts.num_ctx = settingsData?.ContextLength;
+        if ((settingsData?.NumThread ?? 0) > 0) opts.num_thread = settingsData?.NumThread;
+        if ((settingsData?.NumBatch ?? 0) > 0) opts.num_batch = settingsData?.NumBatch;
+        if (settingsData?.UseMlock) opts.use_mlock = true;
+        if (settingsData?.KVCacheType) {
+          opts.cache_type_k = settingsData?.KVCacheType;
+          opts.cache_type_v = settingsData?.KVCacheType;
         }
         fetch("/api/generate", {
           method: "POST",
@@ -94,13 +94,13 @@ export function ModelBar({ chatId }: ModelBarProps) {
       }).catch(() => {});
     }
     const opts: Record<string, unknown> = { use_mmap: false };
-    if (settings.ContextLength > 0) opts.num_ctx = settings.ContextLength;
-    if (settings.NumThread > 0) opts.num_thread = settings.NumThread;
-    if (settings.NumBatch > 0) opts.num_batch = settings.NumBatch;
-    if (settings.UseMlock) opts.use_mlock = true;
-    if (settings.KVCacheType) {
-      opts.cache_type_k = settings.KVCacheType;
-      opts.cache_type_v = settings.KVCacheType;
+    if ((settingsData?.ContextLength ?? 0) > 0) opts.num_ctx = settingsData?.ContextLength;
+    if ((settingsData?.NumThread ?? 0) > 0) opts.num_thread = settingsData?.NumThread;
+    if ((settingsData?.NumBatch ?? 0) > 0) opts.num_batch = settingsData?.NumBatch;
+    if (settingsData?.UseMlock) opts.use_mlock = true;
+    if (settingsData?.KVCacheType) {
+      opts.cache_type_k = settingsData?.KVCacheType;
+      opts.cache_type_v = settingsData?.KVCacheType;
     }
     fetch("/api/generate", {
       method: "POST",

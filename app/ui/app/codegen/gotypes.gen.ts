@@ -350,7 +350,7 @@ export class RAGSource {
     }
 }
 export class ChatEvent {
-    eventName: "chat" | "thinking" | "assistant_with_tools" | "tool_call" | "tool" | "tool_result" | "tool_approval" | "done" | "chat_created" | "rag_sources";
+    eventName: "chat" | "thinking" | "assistant_with_tools" | "tool_call" | "tool" | "tool_result" | "tool_approval" | "done" | "chat_created" | "rag_sources" | "loading";
     content?: string;
     thinking?: string;
     thinkingTimeStart?: Date | undefined;

@@ -9,3 +9,7 @@ ollama
 .env
 .DS_Store
 .claude
+!ui/app/src/components/ModelDiscovery.tsx
+.opencode/
+test-results/
+!ui/app/e2e/model-discovery.spec.ts

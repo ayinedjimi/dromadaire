@@ -13,7 +13,7 @@ interface UseMessageAutoscrollOptions {
 interface MessageAutoscrollBehavior {
   handleNewUserMessage: () => void;
   containerRef: React.RefObject<HTMLElement | null>;
-  innerRef: React.RefObject<HTMLElement | null>;
+  innerRef: React.RefObject<HTMLDivElement | null>;
   spacerHeight: number;
   showScrollBtn: boolean;
   scrollToBottom: () => void;
@@ -24,12 +24,11 @@ function easeOutCubic(t: number): number {
 }
 
 export const useMessageAutoscroll = ({
-  messages,
   isStreaming,
   chatId,
 }: UseMessageAutoscrollOptions): MessageAutoscrollBehavior => {
   const containerRef = useRef<HTMLElement | null>(null);
-  const innerRef = useRef<HTMLElement | null>(null);
+  const innerRef = useRef<HTMLDivElement | null>(null);
   const latchedRef = useRef(true);
   const prevChatIdRef = useRef(chatId);
   const [showScrollBtn, setShowScrollBtn] = useState(false);

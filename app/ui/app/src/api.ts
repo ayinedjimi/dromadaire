@@ -342,6 +342,20 @@ export async function* sendMessage(
     signal,
   });
 
+  // Dromadaire: surface non-2xx responses (auth, validation, server errors) as a
+  // thrown error instead of silently parsing the error body as an empty stream —
+  // without this, callers see a fake "success" with no content and no explanation.
+  if (!response.ok) {
+    let message = `Erreur ${response.status}`;
+    try {
+      const body = await response.json();
+      if (body?.error) message = body.error;
+    } catch {
+      // response body wasn't JSON — keep the generic status message
+    }
+    throw new Error(message);
+  }
+
   // Dromadaire LOT 9B: incognito mode - patched URL above
   for await (const event of parseJsonlFromResponse<ChatEventUnion>(response)) {
     switch (event.eventName) {

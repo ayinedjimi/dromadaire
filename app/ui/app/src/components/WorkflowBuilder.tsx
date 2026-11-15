@@ -17,7 +17,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowLeft, Play, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning, Robot, Plus, CircleNotch } from "@phosphor-icons/react";
+import { ArrowLeft, Play, Stop, FloppyDisk, GitBranch, ArrowCounterClockwise, ArrowClockwise, SquaresFour, ArrowsClockwise, Warning, Robot, Plus, CircleNotch } from "@phosphor-icons/react";
 import { useWorkflows, type WorkflowNodeData, type WorkflowEdgeData } from "@/hooks/useWorkflows";
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import { useSettings } from "@/hooks/useSettings";
@@ -38,13 +38,22 @@ interface ConditionNodeData extends Record<string, unknown> {
 }
 
 const STATUS_COLOR: Record<NodeStatus, string> = {
-  idle: "#a1a1aa", running: "#3b82f6", done: "#22c55e", error: "#ef4444", skipped: "#d4d4d8",
+  idle: "#a1a1aa", loading: "#f59e0b", running: "#3b82f6", done: "#22c55e", error: "#ef4444", skipped: "#d4d4d8",
 };
 
+function IndeterminateBar() {
+  return (
+    <div className="h-1 w-full overflow-hidden rounded-full bg-amber-500/15">
+      <div className="animate-indeterminate-bar h-full w-1/3 rounded-full bg-amber-500" />
+    </div>
+  );
+}
+
 function StatusDot({ status }: { status: NodeStatus }) {
+  const pulsing = status === "running" || status === "loading";
   return (
     <span className="relative flex h-2 w-2 shrink-0">
-      {status === "running" && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: STATUS_COLOR[status] }} />}
+      {pulsing && <span className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-60" style={{ background: STATUS_COLOR[status] }} />}
       <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background: STATUS_COLOR[status] }} />
     </span>
   );
@@ -62,7 +71,8 @@ function AgentNode({ id, data }: NodeProps<Node<AgentNodeData>>) {
       <div className="min-w-0">
         <div className="truncate text-xs font-semibold text-zinc-900 dark:text-zinc-100">{agent?.name ?? "Agent supprimé"}</div>
         <div className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">{agent?.model}</div>
-        {promptTemplate && <div className="text-[9px] text-zinc-400 dark:text-zinc-500">✎ template</div>}
+        {status === "loading" && <div className="text-[9px] font-medium text-amber-600 dark:text-amber-400">⏳ chargement du modèle...</div>}
+        {promptTemplate && status !== "loading" && <div className="text-[9px] text-zinc-400 dark:text-zinc-500">✎ template</div>}
       </div>
       <Handle type="source" position={Position.Right} id={id} />
     </div>
@@ -164,9 +174,11 @@ export default function WorkflowBuilder() {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   const [hasError, setHasError] = useState(false);
   const [lastOutputs, setLastOutputs] = useState<Map<string, string> | null>(null);
+  const activeNode = nodes.find((n) => n.id === activeNodeId);
 
   const history = useRef<Snapshot[]>([]);
   const future = useRef<Snapshot[]>([]);
+  const runAbortRef = useRef<AbortController | null>(null);
 
   const pushHistory = useCallback(() => {
     history.current.push({ nodes, edges });
@@ -274,10 +286,15 @@ export default function WorkflowBuilder() {
     saveWorkflow(workflow.id, toWorkflowNodes(nodes), toWorkflowEdges(edges));
   }, [workflow, nodes, edges, saveWorkflow]);
 
-  const setNodeStatus = useCallback((nodeId: string, status: NodeStatus) => {
+  const setNodeStatus = useCallback((nodeId: string, status: NodeStatus, output?: string) => {
     setNodes((nds) => nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, status } } : n)));
-    setActiveNodeId(status === "running" ? nodeId : (prev) => (prev === nodeId ? null : prev));
-    if (status === "error") setHasError(true);
+    setActiveNodeId(status === "running" || status === "loading" ? nodeId : (prev) => (prev === nodeId ? null : prev));
+    if (status === "error") {
+      setHasError(true);
+      // No streaming delta ever fires for a failed call — write the error
+      // message directly so the transcript panel isn't left blank.
+      setTranscript((t) => ({ ...t, [nodeId]: `⚠ ${output ?? "Échec de l'étape."}` }));
+    }
   }, [setNodes]);
 
   const runFrom = useCallback(async (seedOutputs?: Map<string, string>, skipNodeIds?: Set<string>) => {
@@ -297,20 +314,25 @@ export default function WorkflowBuilder() {
       setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, status: "idle" } })));
     }
 
+    const abortController = new AbortController();
+    runAbortRef.current = abortController;
+
     try {
       const outputs = await runWorkflow(runnableWorkflow, agentsById, prompt, setSettings, {
         onNodeStatus: setNodeStatus,
         onNodeDelta: (nodeId, delta) => setTranscript((t) => ({ ...t, [nodeId]: (t[nodeId] ?? "") + delta })),
-      }, { seedOutputs, skipNodeIds });
+      }, { seedOutputs, skipNodeIds, signal: abortController.signal });
       setLastOutputs(outputs);
       recordWorkflowRun(workflow.id);
     } finally {
+      runAbortRef.current = null;
       setRunning(false);
       setActiveNodeId(null);
     }
   }, [workflow, running, persist, nodes, edges, agentsById, prompt, setSettings, setNodeStatus]);
 
   const launch = useCallback(() => runFrom(), [runFrom]);
+  const stopRun = useCallback(() => runAbortRef.current?.abort(), []);
 
   const retryFromErrors = useCallback(() => {
     if (!lastOutputs) return;
@@ -356,10 +378,15 @@ export default function WorkflowBuilder() {
             <ArrowsClockwise size={14} /> Reprendre
           </Button>
         )}
-        <Button color="blue" onClick={launch} disabled={running || nodes.length === 0}>
-          {running ? <CircleNotch size={14} className="animate-spin" /> : <Play size={14} weight="fill" />}
-          {running ? "En cours..." : "Lancer"}
-        </Button>
+        {running ? (
+          <Button color="red" onClick={stopRun}>
+            <Stop size={14} weight="fill" /> Stop
+          </Button>
+        ) : (
+          <Button color="blue" onClick={launch} disabled={nodes.length === 0}>
+            <Play size={14} weight="fill" /> Lancer
+          </Button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -432,10 +459,20 @@ export default function WorkflowBuilder() {
                   ? transcript[activeNodeId]
                   : Object.values(transcript)[Object.values(transcript).length - 1] || (
                     running ? (
-                      <span className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
-                        <CircleNotch size={14} className="animate-spin" />
-                        Le modèle réfléchit... (peut prendre plusieurs minutes sur CPU)
-                      </span>
+                      activeNode?.data.status === "loading" ? (
+                        <div className="flex flex-col gap-2.5">
+                          <span className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
+                            <CircleNotch size={14} className="animate-spin" />
+                            ⏳ Chargement du modèle en mémoire... (peut prendre plusieurs minutes sur CPU la première fois)
+                          </span>
+                          <IndeterminateBar />
+                        </div>
+                      ) : (
+                        <span className="flex items-center gap-2 text-zinc-400 dark:text-zinc-500">
+                          <CircleNotch size={14} className="animate-spin" />
+                          Le modèle réfléchit... (peut prendre plusieurs minutes sur CPU)
+                        </span>
+                      )
                     ) : "En attente de contenu..."
                   )}
               </div>
