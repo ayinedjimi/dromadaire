@@ -77,8 +77,8 @@ Source: "..\dist\windows-amd64\ollama.exe"; DestDir: "{app}"; DestName: "{#MySer
 ; Bibliotheques backend (CPU, CUDA, etc.)
 Source: "..\dist\windows-amd64\lib\ollama\*"; DestDir: "{app}\lib\ollama\"; Flags: ignoreversion 64bit recursesubdirs
 
-; Moteur CPU lamazero (DLL unique, runtime VC++ requis)
-Source: "..\dist\windows-amd64\lib\lamazero\lamazero.dll"; DestDir: "{app}\lib\lamazero\"; Flags: ignoreversion 64bit
+; Moteurs CPU lamazero : llama.cpp officiel + fork TurboQuant (runtime VC++ requis)
+Source: "..\dist\windows-amd64\lib\lamazero\*.dll"; DestDir: "{app}\lib\lamazero\"; Flags: ignoreversion 64bit
 
 ; VC++ Redistributable (si necessaire)
 #if FileExists("..\dist\windows-amd64\vc_redist.x64.exe")
