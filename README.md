@@ -257,3 +257,8 @@ Developpe par [AYI NEDJIMI Consultants](https://ayinedjimi-consultants.fr) — *
 ## Licence
 
 [MIT](LICENSE) — Libre d'utilisation, de modification et de distribution.
+
+## Documentation technique
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) : architecture du code et intégration des moteurs (dont `lamazero.dll`).
+- [docs/TEST_PLAN.md](docs/TEST_PLAN.md) : plan de tests et commandes.
