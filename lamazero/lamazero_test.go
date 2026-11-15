@@ -22,7 +22,7 @@ func testModel(t *testing.T) string {
 func TestSmokeChat(t *testing.T) {
 	model := testModel(t)
 
-	v, err := Version()
+	v, err := Version("")
 	if err != nil {
 		t.Fatalf("version: %v", err)
 	}

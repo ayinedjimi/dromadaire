@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -116,7 +117,22 @@ func loadOptionsFor(o api.Options) lamazero.LoadOptions {
 	lo.NumCtx = o.NumCtx
 	lo.NumThreads = o.NumThread
 	lo.NumBatch = o.NumBatch
+	applyKVCacheSetting(&lo)
 	return lo
+}
+
+// applyKVCacheSetting selects the KV cache type from DROMADAIRE_LAMAZERO_KV:
+//
+//	unset / "f16" : official engine, F16 cache (default)
+//	"turbo3"      : TurboQuant engine, compressed 3-bit cache
+//	"turbo4"      : TurboQuant engine, compressed 4-bit cache
+func applyKVCacheSetting(lo *lamazero.LoadOptions) {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("DROMADAIRE_LAMAZERO_KV"))) {
+	case "turbo3":
+		lo.Engine, lo.KVTypeK, lo.KVTypeV = lamazero.EngineTurbo, lamazero.KVTypeTurbo3, lamazero.KVTypeTurbo3
+	case "turbo4":
+		lo.Engine, lo.KVTypeK, lo.KVTypeV = lamazero.EngineTurbo, lamazero.KVTypeTurbo4, lamazero.KVTypeTurbo4
+	}
 }
 
 // samplingFor maps Dromadaire options to lamazero sampling parameters.

@@ -1,9 +1,15 @@
 //go:build windows
 
-// Package lamazero is an optional inference engine backed by lamazero.dll
-// (llama.cpp absorbed statically, API v3). The DLL is loaded at runtime with
-// LoadLibrary, so the application starts normally when it is absent, and the
-// existing GPU engine is not affected.
+// Package lamazero is an optional inference engine backed by lamazero DLLs
+// (llama.cpp absorbed statically, API v3). Two builds are shipped:
+//
+//   - "official" (lamazero.dll): upstream ggml-org llama.cpp, the most recent
+//     architectures (for example lfm3).
+//   - "turbo"    (lamazero-turbo.dll): the AtomicBot llama.cpp fork with the
+//     TurboQuant compressed KV cache (turbo3 / turbo4).
+//
+// DLLs are loaded at runtime with LoadLibrary, so the application starts
+// normally when they are absent, and the GPU engine is not affected.
 package lamazero
 
 import (
@@ -19,10 +25,14 @@ import (
 	"unsafe"
 )
 
-// ErrUnavailable is returned when lamazero.dll cannot be found or loaded.
+// ErrUnavailable is returned when the requested engine cannot be found or loaded.
 var ErrUnavailable = errors.New("lamazero: moteur CPU indisponible")
 
-const dllName = "lamazero.dll"
+// Engine names.
+const (
+	EngineOfficial = "official"
+	EngineTurbo    = "turbo"
+)
 
 // Status codes mirrored from lamazero.h.
 const (
@@ -60,21 +70,28 @@ func StatusError(op string, status int) error {
 }
 
 // LoadOptions are the parameters used when loading a model. Zero or negative
-// values keep the llama.cpp / lamazero default (see DefaultLoadOptions).
+// values keep the defaults (see DefaultLoadOptions).
 type LoadOptions struct {
-	NumCtx     int  // 0 = model default
-	NumThreads int  // 0 = auto
-	NumBatch   int  // 0 = auto
-	FlashAttn  int  // -1 auto, 0 off, 1 on
-	KVTypeK    int  // ggml_type of the K cache, -1 = F16
-	KVTypeV    int  // ggml_type of the V cache, -1 = F16
-	UseMmap    int  // -1 default, 0 off, 1 on
-	UseMlock   bool // keep the model resident in RAM
+	Engine     string // EngineOfficial (default) or EngineTurbo
+	NumCtx     int    // 0 = model default
+	NumThreads int    // 0 = auto
+	NumBatch   int    // 0 = auto
+	FlashAttn  int    // -1 auto, 0 off, 1 on
+	KVTypeK    int    // ggml_type of the K cache, -1 = F16 (turbo3 = 44, turbo4 = 47 on the fork)
+	KVTypeV    int    // ggml_type of the V cache, -1 = F16
+	UseMmap    int    // -1 default, 0 off, 1 on
+	UseMlock   bool   // keep the model resident in RAM
 }
+
+// KV cache type ids of the TurboQuant fork (ggml_type values).
+const (
+	KVTypeTurbo3 = 44
+	KVTypeTurbo4 = 47
+)
 
 // DefaultLoadOptions returns the lamazero defaults.
 func DefaultLoadOptions() LoadOptions {
-	return LoadOptions{FlashAttn: -1, KVTypeK: -1, KVTypeV: -1, UseMmap: -1}
+	return LoadOptions{Engine: EngineOfficial, FlashAttn: -1, KVTypeK: -1, KVTypeV: -1, UseMmap: -1}
 }
 
 // SamplingOptions control token selection. Zero values are not "defaults":
@@ -124,10 +141,9 @@ type cSamplingParams struct {
 }
 
 type engine struct {
+	name            string
 	dll             *syscall.DLL
 	version         *syscall.Proc
-	defaultLoad     *syscall.Proc
-	defaultSampling *syscall.Proc
 	loadEx          *syscall.Proc
 	setSampling     *syscall.Proc
 	clearCache      *syscall.Proc
@@ -137,45 +153,60 @@ type engine struct {
 	callback        uintptr
 }
 
+type engineEntry struct {
+	once sync.Once
+	e    *engine
+	err  error
+}
+
 var (
-	engineOnce sync.Once
-	eng        *engine
-	engineErr  error
+	enginesMu sync.Mutex
+	engines   = map[string]*engineEntry{}
 )
 
-// dllPath returns the DLL location: LAMAZERO_DLL if set, otherwise
-// lib\lamazero\lamazero.dll next to the executable.
-func dllPath() string {
-	if p := os.Getenv("LAMAZERO_DLL"); p != "" {
+// dllFileName returns the DLL file name of an engine.
+func dllFileName(name string) string {
+	if name == EngineTurbo {
+		return "lamazero-turbo.dll"
+	}
+	return "lamazero.dll"
+}
+
+// dllPath returns the DLL location of an engine. LAMAZERO_DLL overrides the
+// official engine path (used by tests); the turbo engine uses LAMAZERO_DLL_TURBO.
+// Otherwise the DLL is looked up in lib\lamazero next to the executable.
+func dllPath(name string) string {
+	if name == EngineTurbo {
+		if p := os.Getenv("LAMAZERO_DLL_TURBO"); p != "" {
+			return p
+		}
+	} else if p := os.Getenv("LAMAZERO_DLL"); p != "" {
 		return p
 	}
 	exe, err := os.Executable()
 	if err != nil {
-		return dllName
+		return dllFileName(name)
 	}
-	return filepath.Join(filepath.Dir(exe), "lib", "lamazero", dllName)
+	return filepath.Join(filepath.Dir(exe), "lib", "lamazero", dllFileName(name))
 }
 
-func loadEngine() {
-	path := dllPath()
+func loadEngine(name string) (*engine, error) {
+	path := dllPath(name)
 	dll, err := syscall.LoadDLL(path)
 	if err != nil {
-		engineErr = fmt.Errorf("%w: %v", ErrUnavailable, err)
-		return
+		return nil, fmt.Errorf("%w: %s : %v", ErrUnavailable, path, err)
 	}
-	e := &engine{dll: dll}
+	e := &engine{name: name, dll: dll}
 	var procErr error
-	proc := func(name string) *syscall.Proc {
+	proc := func(sym string) *syscall.Proc {
 		if procErr != nil {
 			return nil
 		}
 		var p *syscall.Proc
-		p, procErr = dll.FindProc(name)
+		p, procErr = dll.FindProc(sym)
 		return p
 	}
 	e.version = proc("lamazero_version")
-	e.defaultLoad = proc("lamazero_default_load_params")
-	e.defaultSampling = proc("lamazero_default_sampling_params")
 	e.loadEx = proc("lamazero_load_ex")
 	e.setSampling = proc("lamazero_set_sampling")
 	e.clearCache = proc("lamazero_clear_cache")
@@ -183,21 +214,31 @@ func loadEngine() {
 	e.quickFree = proc("lamazero_quick_free")
 	e.chatStreamEx = proc("lamazero_chat_stream_ex")
 	if procErr != nil {
-		engineErr = fmt.Errorf("%w: symbole manquant dans %s (API v3 requise): %v", ErrUnavailable, path, procErr)
-		return
+		return nil, fmt.Errorf("%w: symbole manquant dans %s (API v3 requise): %v", ErrUnavailable, path, procErr)
 	}
 	e.callback = syscall.NewCallback(tokenDispatch)
-	eng = e
+	return e, nil
 }
 
-func getEngine() (*engine, error) {
-	engineOnce.Do(loadEngine)
-	return eng, engineErr
+// getEngine loads (once) and returns the engine with the given name.
+func getEngine(name string) (*engine, error) {
+	if name == "" {
+		name = EngineOfficial
+	}
+	enginesMu.Lock()
+	ent, ok := engines[name]
+	if !ok {
+		ent = &engineEntry{}
+		engines[name] = ent
+	}
+	enginesMu.Unlock()
+	ent.once.Do(func() { ent.e, ent.err = loadEngine(name) })
+	return ent.e, ent.err
 }
 
-// Version returns the lamazero build string.
-func Version() (string, error) {
-	e, err := getEngine()
+// Version returns the build string of an engine (empty name = official).
+func Version(name string) (string, error) {
+	e, err := getEngine(name)
 	if err != nil {
 		return "", err
 	}
@@ -278,6 +319,7 @@ func completeUTF8Prefix(b []byte) int {
 // Session is a loaded model with its context. Calls on one Session are serialized.
 type Session struct {
 	mu     sync.Mutex
+	eng    *engine
 	handle uintptr
 	closed bool
 }
@@ -289,9 +331,9 @@ type Stats struct {
 	Elapsed      time.Duration // total duration
 }
 
-// Load opens a GGUF model with explicit options.
+// Load opens a GGUF model with explicit options, using the engine named in lo.Engine.
 func Load(modelPath string, lo LoadOptions) (*Session, error) {
-	e, err := getEngine()
+	e, err := getEngine(lo.Engine)
 	if err != nil {
 		return nil, err
 	}
@@ -325,8 +367,11 @@ func Load(modelPath string, lo LoadOptions) (*Session, error) {
 		}
 		return nil, StatusError("load", int(status))
 	}
-	return &Session{handle: h}, nil
+	return &Session{eng: e, handle: h}, nil
 }
+
+// Engine returns the name of the engine serving this session.
+func (s *Session) Engine() string { return s.eng.name }
 
 // SetSampling replaces the sampler used by subsequent generations.
 func (s *Session) SetSampling(so SamplingOptions) error {
@@ -334,10 +379,6 @@ func (s *Session) SetSampling(so SamplingOptions) error {
 	defer s.mu.Unlock()
 	if s.closed {
 		return errors.New("lamazero: session fermee")
-	}
-	e, err := getEngine()
-	if err != nil {
-		return err
 	}
 	var grammar *byte
 	var gbytes []byte
@@ -357,7 +398,7 @@ func (s *Session) SetSampling(so SamplingOptions) error {
 		Seed:             so.Seed,
 		Grammar:          grammar,
 	}
-	r, _, _ := e.setSampling.Call(s.handle, uintptr(unsafe.Pointer(&p)))
+	r, _, _ := s.eng.setSampling.Call(s.handle, uintptr(unsafe.Pointer(&p)))
 	runtime.KeepAlive(gbytes)
 	runtime.KeepAlive(&p)
 	if status := int(int32(r)); status < 0 {
@@ -373,8 +414,7 @@ func (s *Session) ClearCache() {
 	if s.closed {
 		return
 	}
-	e, _ := getEngine()
-	e.clearCache.Call(s.handle)
+	s.eng.clearCache.Call(s.handle)
 }
 
 // ContextLength returns the context size of the loaded model.
@@ -384,8 +424,7 @@ func (s *Session) ContextLength() int {
 	if s.closed {
 		return 0
 	}
-	e, _ := getEngine()
-	r, _, _ := e.nCtx.Call(s.handle)
+	r, _, _ := s.eng.nCtx.Call(s.handle)
 	return int(int32(r))
 }
 
@@ -396,8 +435,7 @@ func (s *Session) Close() {
 	if s.closed {
 		return
 	}
-	e, _ := getEngine()
-	e.quickFree.Call(s.handle)
+	s.eng.quickFree.Call(s.handle)
 	s.closed = true
 }
 
@@ -409,10 +447,6 @@ func (s *Session) ChatStream(prompt string, maxNewTokens int, timeout time.Durat
 	defer s.mu.Unlock()
 	if s.closed {
 		return Stats{}, errors.New("lamazero: session fermee")
-	}
-	e, err := getEngine()
-	if err != nil {
-		return Stats{}, err
 	}
 	cprompt, err := syscall.BytePtrFromString(prompt)
 	if err != nil {
@@ -441,12 +475,12 @@ func (s *Session) ChatStream(prompt string, maxNewTokens int, timeout time.Durat
 
 	var nGen, reused int32
 	var elapsed float64
-	r, _, _ := e.chatStreamEx.Call(
+	r, _, _ := s.eng.chatStreamEx.Call(
 		s.handle,
 		uintptr(unsafe.Pointer(cprompt)),
 		uintptr(maxNewTokens),
 		uintptr(int(timeout/time.Millisecond)),
-		e.callback,
+		s.eng.callback,
 		id,
 		uintptr(unsafe.Pointer(&nGen)),
 		uintptr(unsafe.Pointer(&reused)),

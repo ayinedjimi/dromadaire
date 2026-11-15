@@ -1,7 +1,7 @@
 //go:build !windows
 
-// Package lamazero: on non-Windows systems the engine is unavailable and every
-// call returns ErrUnavailable. The API matches lamazero_windows.go.
+// Package lamazero: on non-Windows systems the engines are unavailable and
+// every call returns ErrUnavailable. The API matches lamazero_windows.go.
 package lamazero
 
 import (
@@ -12,8 +12,21 @@ import (
 // ErrUnavailable is returned when the lamazero engine cannot be used.
 var ErrUnavailable = errors.New("lamazero: moteur CPU indisponible (Windows uniquement)")
 
+// Engine names (see lamazero_windows.go).
+const (
+	EngineOfficial = "official"
+	EngineTurbo    = "turbo"
+)
+
+// KV cache type ids of the TurboQuant fork (ggml_type values).
+const (
+	KVTypeTurbo3 = 44
+	KVTypeTurbo4 = 47
+)
+
 // LoadOptions mirrors lamazero_windows.go.
 type LoadOptions struct {
+	Engine     string
 	NumCtx     int
 	NumThreads int
 	NumBatch   int
@@ -26,7 +39,7 @@ type LoadOptions struct {
 
 // DefaultLoadOptions returns the lamazero defaults.
 func DefaultLoadOptions() LoadOptions {
-	return LoadOptions{FlashAttn: -1, KVTypeK: -1, KVTypeV: -1, UseMmap: -1}
+	return LoadOptions{Engine: EngineOfficial, FlashAttn: -1, KVTypeK: -1, KVTypeV: -1, UseMmap: -1}
 }
 
 // SamplingOptions mirrors lamazero_windows.go.
@@ -56,13 +69,16 @@ type Stats struct {
 }
 
 // Version reports that the engine is not available on this platform.
-func Version() (string, error) { return "", ErrUnavailable }
+func Version(name string) (string, error) { return "", ErrUnavailable }
 
 // Session is a placeholder on platforms without lamazero.
 type Session struct{}
 
 // Load always fails on this platform.
 func Load(modelPath string, lo LoadOptions) (*Session, error) { return nil, ErrUnavailable }
+
+// Engine returns an empty name.
+func (s *Session) Engine() string { return "" }
 
 // SetSampling always fails on this platform.
 func (s *Session) SetSampling(so SamplingOptions) error { return ErrUnavailable }
