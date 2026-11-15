@@ -941,3 +941,11 @@ export async function* runBenchmark(
   }
   yield* parseJsonlFromResponse<BenchmarkEvent>(response);
 }
+
+// ========== Restart status (settings that need a server restart) ==========
+
+export async function getRestartStatus(): Promise<{ needed: boolean }> {
+  const response = await fetch(`${API_BASE}/api/v1/restart-status`);
+  if (!response.ok) throw new Error("restart-status");
+  return response.json();
+}

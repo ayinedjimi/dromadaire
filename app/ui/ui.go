@@ -376,6 +376,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/v1/system-resources", handle(s.getSystemResources))
 	mux.Handle("POST /api/v1/autoconfig", handle(s.autoconfig))
 	mux.Handle("POST /api/v1/restart-server", handle(s.restartServer))
+	mux.Handle("GET /api/v1/restart-status", handle(s.restartStatus))
 
 	// Dromadaire: writing style analysis
 	mux.Handle("POST /api/v1/analyze-style", handle(s.analyzeStyle))
@@ -3735,6 +3736,21 @@ func (s *Server) autoconfig(w http.ResponseWriter, r *http.Request) error {
 			"ContextLength":   ctxLength,
 		},
 	})
+}
+
+// restartStatus tells the UI whether a server restart is needed to apply
+// settings (currently the lamazero engine and KV cache).
+func (s *Server) restartStatus(w http.ResponseWriter, r *http.Request) error {
+	settings, err := s.Store.Settings()
+	if err != nil {
+		return err
+	}
+	needed := false
+	if s.OllamaServer != nil {
+		needed = s.OllamaServer.LamazeroRestartPending(settings.LamazeroEngine, settings.LamazeroKVCache)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(map[string]bool{"needed": needed})
 }
 
 func (s *Server) restartServer(w http.ResponseWriter, r *http.Request) error {

@@ -35,6 +35,11 @@ type Server struct {
 	port      string // Dromadaire: dynamically allocated port for the internal server
 	restartCh chan struct{}
 
+	// Engine settings the running server was started with (lamazero engine and KV cache).
+	appliedMu       sync.Mutex
+	appliedEngine   string
+	appliedKV       string
+
 	// Dromadaire: separate, opt-in ollama server bound to the standard port
 	// (11434) so third-party Ollama-compatible apps can reuse the same
 	// models. Fully independent from the internal server above.
@@ -412,6 +417,7 @@ func (s *Server) cmd(ctx context.Context) (*exec.Cmd, error) {
 	// Moteur CPU lamazero (modèles lamazero/) : moteur et cache KV choisis dans les réglages.
 	env["DROMADAIRE_LAMAZERO_ENGINE"] = settings.LamazeroEngine
 	env["DROMADAIRE_LAMAZERO_KV"] = settings.LamazeroKVCache
+	s.setAppliedLamazero(settings.LamazeroEngine, settings.LamazeroKVCache)
 
 	if _, ok := env["OLLAMA_MAX_QUEUE"]; !ok {
 		env["OLLAMA_MAX_QUEUE"] = "16"
@@ -842,4 +848,35 @@ func GetLastLogLines(n int) []string {
 
 func (s *Server) GetPort() string {
 	return s.port
+}
+
+// normalizeLamazeroSetting maps an empty setting to its default.
+func normalizeLamazeroSetting(engine, kv string) (string, string) {
+	if engine == "" {
+		engine = "auto"
+	}
+	if kv == "" {
+		kv = "f16"
+	}
+	return engine, kv
+}
+
+// setAppliedLamazero records the lamazero settings used to start the server.
+func (s *Server) setAppliedLamazero(engine, kv string) {
+	engine, kv = normalizeLamazeroSetting(engine, kv)
+	s.appliedMu.Lock()
+	defer s.appliedMu.Unlock()
+	s.appliedEngine, s.appliedKV = engine, kv
+}
+
+// LamazeroRestartPending reports whether the lamazero settings differ from
+// those the running server was started with: a restart is needed to apply them.
+func (s *Server) LamazeroRestartPending(engine, kv string) bool {
+	engine, kv = normalizeLamazeroSetting(engine, kv)
+	s.appliedMu.Lock()
+	defer s.appliedMu.Unlock()
+	if s.appliedEngine == "" {
+		return false // server not started yet
+	}
+	return s.appliedEngine != engine || s.appliedKV != kv
 }
