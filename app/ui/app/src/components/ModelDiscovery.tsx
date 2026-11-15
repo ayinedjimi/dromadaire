@@ -6,6 +6,8 @@ import {
   Trash, CaretDown, CaretUp, Globe, Star, Cpu, Memory
 } from "@phosphor-icons/react";
 import { API_BASE } from "@/lib/config";
+import { pullModelStream, pullNameFor, PullError } from "@/lib/modelPull";
+import { findAbliteratedModels, rankAbliteratedFirst, hfSearchUrl } from "@/lib/modelSearch";
 import { useSystemResources } from "@/hooks/useSystemResources";
 
 interface ModelEntry {
@@ -19,6 +21,7 @@ interface ModelEntry {
   author?: string;
   downloads?: number;
   hfId?: string;
+  quant?: string;
 }
 
 const CURATED_MODELS: ModelEntry[] = [
@@ -283,6 +286,7 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
         || ggufFiles.find((f: any) => /Q4_K_S/i.test(f.rfilename))
         || ggufFiles[0];
       const sizeBytes = recommendedFile?.size || 0;
+      const quantMatch = String(recommendedFile?.rfilename || "").match(/(IQ\d_[A-Z0-9_]+|Q\d_K_[A-Z]+|Q\d_\d|BF16|F16)/i);
       const modelName = m.modelId?.split("/").pop() || m.id?.split("/").pop() || "";
       const paramsMatch = modelName.match(/(\d+(?:\.\d+)?)[bB]/i);
       return {
@@ -296,6 +300,7 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
         author: m.author || m.modelId?.split("/")[0] || m.id?.split("/")[0] || "",
         downloads: m.downloads || 0,
         hfId: m.modelId || m.id,
+        quant: quantMatch ? quantMatch[1].toUpperCase() : undefined,
       };
     });
   }, []);
@@ -354,13 +359,17 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
     }
     setOnlineLoading(true);
     try {
-      const resp = await fetch(
-        `https://huggingface.co/api/models?search=${encodeURIComponent(query)}&filter=gguf&sort=downloads&direction=-1&limit=30`,
-        { signal: AbortSignal.timeout(10000) }
-      );
-      if (!resp.ok) throw new Error("HuggingFace API error");
-      const data: any[] = await resp.json();
-      setOnlineResults(parseHfModels(data));
+      if (mode === "abliterated") {
+        // Recherche dédiée : plusieurs formulations, doublons retirés, seuls les modèles sans censure.
+        const data = await findAbliteratedModels(rawQuery, { signal: AbortSignal.timeout(10000) });
+        setOnlineResults(parseHfModels(data as any[]));
+      } else {
+        const resp = await fetch(hfSearchUrl(query), { signal: AbortSignal.timeout(10000) });
+        if (!resp.ok) throw new Error("HuggingFace API error");
+        const data: any[] = await resp.json();
+        // Les modèles abliterated sont placés en premier.
+        setOnlineResults(rankAbliteratedFirst(parseHfModels(data)));
+      }
     } catch {
       setOnlineResults([]);
     }
@@ -444,46 +453,39 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
     refreshRunning.current = false;
   }, [onlineMode, fetchTrendingModels]);
 
-  const pullModel = useCallback(async (modelName: string) => {
-    setDownloads(prev => new Map(prev).set(modelName, { state: "pulling", progress: { status: "Initialisation…", completed: 0, total: 0, percent: 0 } }));
+  // Téléchargements en cours : un AbortController par modèle, pour pouvoir annuler.
+  const pullControllers = useRef(new Map<string, AbortController>());
 
-    const pullName = modelName.includes("/") ? `hf.co/${modelName}` : modelName;
+  const cancelPull = useCallback((modelName: string) => {
+    pullControllers.current.get(modelName)?.abort();
+  }, []);
+
+  const pullModel = useCallback(async (modelName: string, quant?: string) => {
+    if (pullControllers.current.has(modelName)) return; // déjà en cours
+    const controller = new AbortController();
+    pullControllers.current.set(modelName, controller);
+    const setState = (state: DownloadState, progress: DownloadProgress) =>
+      setDownloads(prev => new Map(prev).set(modelName, { state, progress }));
+
+    setState("pulling", { status: "Initialisation…", completed: 0, total: 0, percent: 0 });
     try {
-      const resp = await fetch(`${API_BASE}/api/pull`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: pullName, stream: true }),
+      await pullModelStream({
+        apiBase: API_BASE,
+        name: pullNameFor(modelName, quant),
+        signal: controller.signal,
+        onProgress: (p) => setState("pulling", p),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const j = JSON.parse(line);
-            const completed = j.completed || 0;
-            const total = j.total || 0;
-            const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-            setDownloads(prev => new Map(prev).set(modelName, {
-              state: "pulling",
-              progress: { status: j.status || "Téléchargement…", completed, total, percent }
-            }));
-          } catch { /* skip bad JSON lines */ }
-        }
-      }
-      setDownloads(prev => new Map(prev).set(modelName, { state: "done", progress: { status: "Terminé", completed: 1, total: 1, percent: 100 } }));
+      setState("done", { status: "Terminé", completed: 1, total: 1, percent: 100 });
       await loadModels();
     } catch (err) {
-      setDownloads(prev => new Map(prev).set(modelName, { state: "error", progress: { status: String(err), completed: 0, total: 0, percent: 0 } }));
+      if ((err as Error).name === "AbortError") {
+        setState("idle", { status: "Annulé", completed: 0, total: 0, percent: 0 });
+      } else {
+        const message = err instanceof PullError ? err.message : "Téléchargement échoué";
+        setState("error", { status: message, completed: 0, total: 0, percent: 0 });
+      }
+    } finally {
+      pullControllers.current.delete(modelName);
     }
   }, [loadModels]);
 
@@ -702,7 +704,8 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
                   model={model}
                   installed={isInstalled(model.name)}
                   downloadState={downloads.get(model.name)}
-                  onPull={() => pullModel(model.name)}
+                  onPull={() => pullModel(model.name, model.quant)}
+                  onCancel={() => cancelPull(model.name)}
                   availableRam={availableRam}
                   totalRam={totalRam}
                   variant="online"
@@ -755,7 +758,8 @@ export function ModelDiscovery({ onBack }: { onBack: () => void }) {
                     model={model}
                     installed={false}
                     downloadState={downloads.get(model.name)}
-                    onPull={() => pullModel(model.name)}
+                    onPull={() => pullModel(model.name, model.quant)}
+                    onCancel={() => cancelPull(model.name)}
                     availableRam={availableRam}
                     totalRam={totalRam}
                     variant="recommended"
@@ -888,11 +892,12 @@ function InstalledModelRow({ model, onDelete, isDeleting }: {
 
 /* ── Model Card (for recommended / online results) ── */
 
-function ModelCard({ model, installed, downloadState, onPull, availableRam, totalRam, variant }: {
+function ModelCard({ model, installed, downloadState, onPull, onCancel, availableRam, totalRam, variant }: {
   model: ModelEntry;
   installed: boolean;
   downloadState?: { state: DownloadState; progress: DownloadProgress };
   onPull: () => void;
+  onCancel?: () => void;
   availableRam: number;
   totalRam: number;
   variant: "recommended" | "online";
@@ -1015,6 +1020,16 @@ function ModelCard({ model, installed, downloadState, onPull, availableRam, tota
               />
             </div>
             <span className="text-[10px] tabular-nums text-neutral-400">{downloadState.progress.percent}%</span>
+            {onCancel && (
+              <button
+                type="button"
+                data-testid="pull-cancel"
+                onClick={onCancel}
+                className="px-2 py-0.5 rounded-md text-[11px] text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+              >
+                Annuler
+              </button>
+            )}
           </div>
         ) : isError ? (
           <button
