@@ -781,6 +781,8 @@ export interface AutoconfigResult {
     MaxLoadedModels: number;
     KVCacheType: string;
     NumBatch: number;
+    LamazeroEngine: string;
+    LamazeroKVCache: string;
     ContextLength: number;
   };
 }

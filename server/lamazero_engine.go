@@ -123,16 +123,42 @@ func loadOptionsFor(o api.Options) lamazero.LoadOptions {
 
 // applyKVCacheSetting selects the KV cache type from DROMADAIRE_LAMAZERO_KV:
 //
-//	unset / "f16" : official engine, F16 cache (default)
-//	"turbo3"      : TurboQuant engine, compressed 3-bit cache
-//	"turbo4"      : TurboQuant engine, compressed 4-bit cache
+//	DROMADAIRE_LAMAZERO_ENGINE : "auto" (default), "official" or "turbo"
+//	DROMADAIRE_LAMAZERO_KV     : "f16" (default), "turbo3" or "turbo4"
+//
+// "auto" picks the TurboQuant engine when a compressed cache is requested and
+// the official engine otherwise. "official" cannot use the TurboQuant cache
+// types, so the cache falls back to F16 in that case.
 func applyKVCacheSetting(lo *lamazero.LoadOptions) {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("DROMADAIRE_LAMAZERO_KV"))) {
+	kv := strings.ToLower(strings.TrimSpace(os.Getenv("DROMADAIRE_LAMAZERO_KV")))
+	engine := strings.ToLower(strings.TrimSpace(os.Getenv("DROMADAIRE_LAMAZERO_ENGINE")))
+
+	var kvType int
+	switch kv {
 	case "turbo3":
-		lo.Engine, lo.KVTypeK, lo.KVTypeV = lamazero.EngineTurbo, lamazero.KVTypeTurbo3, lamazero.KVTypeTurbo3
+		kvType = lamazero.KVTypeTurbo3
 	case "turbo4":
-		lo.Engine, lo.KVTypeK, lo.KVTypeV = lamazero.EngineTurbo, lamazero.KVTypeTurbo4, lamazero.KVTypeTurbo4
+		kvType = lamazero.KVTypeTurbo4
+	default:
+		kvType = -1 // F16
 	}
+
+	switch engine {
+	case "official":
+		lo.Engine = lamazero.EngineOfficial
+		if kvType >= 0 {
+			kvType = -1
+		}
+	case "turbo":
+		lo.Engine = lamazero.EngineTurbo
+	default: // auto
+		if kvType >= 0 {
+			lo.Engine = lamazero.EngineTurbo
+		} else {
+			lo.Engine = lamazero.EngineOfficial
+		}
+	}
+	lo.KVTypeK, lo.KVTypeV = kvType, kvType
 }
 
 // samplingFor maps Dromadaire options to lamazero sampling parameters.

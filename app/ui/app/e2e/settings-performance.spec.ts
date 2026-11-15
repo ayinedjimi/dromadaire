@@ -241,7 +241,7 @@ test.describe("Settings Performance — KVCacheType", () => {
 
   test("KV cache options include f16, q8_0, q4_0", async ({ page }) => {
     const kvSelect = page.locator("select").filter({
-      has: page.locator('option[value="f16"]'),
+      has: page.locator('option[value="q8_0"]'),
     });
     await expect(kvSelect).toBeVisible({ timeout: 10000 });
 
@@ -351,7 +351,7 @@ test.describe("Settings Performance — Restart Notification", () => {
 
     // Change KV cache type to trigger needsRestart
     const kvSelect = page.locator("select").filter({
-      has: page.locator('option[value="f16"]'),
+      has: page.locator('option[value="q8_0"]'),
     });
     await expect(kvSelect).toBeVisible({ timeout: 10000 });
     await kvSelect.selectOption("q4_0");
@@ -389,5 +389,36 @@ test.describe("Settings Performance — Restart Notification", () => {
     await expect(
       page.getByText("RAM : 16.0 GB").first(),
     ).toBeVisible({ timeout: 5000 });
+  });
+});
+
+// ─── Moteur CPU lamazero : moteur et cache KV ───────────────────────
+
+test.describe("Settings Performance — Moteur CPU lamazero", () => {
+  test.beforeEach(async ({ page }) => {
+    await setupPerfMocks(page);
+    await goToSettings(page);
+  });
+
+  test("les deux sélecteurs lamazero sont visibles avec leurs options", async ({ page }) => {
+    const engine = page.getByTestId("lamazero-engine");
+    const kv = page.getByTestId("lamazero-kv");
+    await expect(engine).toBeVisible({ timeout: 10000 });
+    await expect(kv).toBeVisible();
+    await expect(engine.locator('option[value="auto"]')).toBeAttached();
+    await expect(engine.locator('option[value="official"]')).toBeAttached();
+    await expect(engine.locator('option[value="turbo"]')).toBeAttached();
+    await expect(kv.locator('option[value="f16"]')).toBeAttached();
+    await expect(kv.locator('option[value="turbo3"]')).toBeAttached();
+    await expect(kv.locator('option[value="turbo4"]')).toBeAttached();
+  });
+
+  test("changer le moteur et le cache KV envoie les réglages", async ({ page }) => {
+    const getPayloads = captureSettingsPayloads(page);
+    await page.getByTestId("lamazero-engine").selectOption("turbo");
+    await expect.poll(() => getPayloads().some((p) => p.LamazeroEngine === "turbo")).toBe(true);
+
+    await page.getByTestId("lamazero-kv").selectOption("turbo3");
+    await expect.poll(() => getPayloads().some((p) => p.LamazeroKVCache === "turbo3")).toBe(true);
   });
 });

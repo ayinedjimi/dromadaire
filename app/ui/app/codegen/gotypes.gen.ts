@@ -472,6 +472,8 @@ export class Settings {
     MaxLoadedModels: number;
     KVCacheType: string;
     NumBatch: number;
+    LamazeroEngine: string;
+    LamazeroKVCache: string;
     UseMlock: boolean;
     RopeFrequencyBase: number;
     RopeFrequencyScale: number;
@@ -528,6 +530,8 @@ export class Settings {
         this.MaxLoadedModels = source["MaxLoadedModels"];
         this.KVCacheType = source["KVCacheType"];
         this.NumBatch = source["NumBatch"];
+        this.LamazeroEngine = source["LamazeroEngine"];
+        this.LamazeroKVCache = source["LamazeroKVCache"];
         this.UseMlock = source["UseMlock"];
         this.RopeFrequencyBase = source["RopeFrequencyBase"];
         this.RopeFrequencyScale = source["RopeFrequencyScale"];

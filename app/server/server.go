@@ -409,6 +409,10 @@ func (s *Server) cmd(ctx context.Context) (*exec.Cmd, error) {
 		env["OLLAMA_KV_CACHE_TYPE"] = "q8_0"
 	}
 
+	// Moteur CPU lamazero (modèles lamazero/) : moteur et cache KV choisis dans les réglages.
+	env["DROMADAIRE_LAMAZERO_ENGINE"] = settings.LamazeroEngine
+	env["DROMADAIRE_LAMAZERO_KV"] = settings.LamazeroKVCache
+
 	if _, ok := env["OLLAMA_MAX_QUEUE"]; !ok {
 		env["OLLAMA_MAX_QUEUE"] = "16"
 	}

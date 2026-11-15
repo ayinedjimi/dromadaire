@@ -16,7 +16,7 @@ import (
 // currentSchemaVersion defines the current database schema version.
 // v1-v16: upstream Ollama v0.31.2
 // v17-v29: Dromadaire custom (privacy, RAG, encryption, perf, UI)
-const currentSchemaVersion = 31
+const currentSchemaVersion = 32
 
 // database wraps the SQLite connection.
 // SQLite handles its own locking for concurrent access:
@@ -115,6 +115,8 @@ func (db *database) init() error {
 		num_batch INTEGER NOT NULL DEFAULT 0,
 		vulkan_enabled BOOLEAN NOT NULL DEFAULT 0,
 		num_parallel INTEGER NOT NULL DEFAULT 0,
+		lamazero_engine TEXT NOT NULL DEFAULT 'auto',
+		lamazero_kv_cache TEXT NOT NULL DEFAULT 'f16',
 		response_mode TEXT NOT NULL DEFAULT '',
 		system_prompt TEXT NOT NULL DEFAULT '',
 		human_sub_mode TEXT NOT NULL DEFAULT '',
@@ -413,6 +415,11 @@ func (db *database) migrate() error {
 				return fmt.Errorf("migrate v30 to v31: %w", err)
 			}
 			version = 31
+		case 31:
+			if err := db.migrateV31ToV32(); err != nil {
+				return fmt.Errorf("migrate v31 to v32: %w", err)
+			}
+			version = 32
 		default:
 			version = currentSchemaVersion
 		}
@@ -936,6 +943,19 @@ func (db *database) migrateV30ToV31() error {
 		return err
 	}
 	return db.setSchemaVersion(31)
+}
+
+// migrateV31ToV32 adds the lamazero CPU engine settings (engine and KV cache type).
+func (db *database) migrateV31ToV32() error {
+	for _, stmt := range []string{
+		`ALTER TABLE settings ADD COLUMN lamazero_engine TEXT NOT NULL DEFAULT 'auto'`,
+		`ALTER TABLE settings ADD COLUMN lamazero_kv_cache TEXT NOT NULL DEFAULT 'f16'`,
+	} {
+		if _, err := db.conn.Exec(stmt); err != nil && !duplicateColumnError(err) {
+			return err
+		}
+	}
+	return db.setSchemaVersion(32)
 }
 
 // ============================================================
@@ -1869,7 +1889,7 @@ func (db *database) getSettings() (Settings, error) {
 			lock_timeout_minutes, auto_delete_days, clipboard_clear_seconds,
 			search_enabled, rag_citations_enabled, rag_preview_enabled, artifacts_enabled,
 			theme, keyboard_shortcuts_enabled,
-			num_thread, keep_alive, max_loaded_models, kv_cache_type, num_batch, vulkan_enabled, num_parallel,
+			num_thread, keep_alive, max_loaded_models, kv_cache_type, num_batch, vulkan_enabled, num_parallel, lamazero_engine, lamazero_kv_cache,
 			response_mode, system_prompt, human_sub_mode, writing_style_rules, style_analysis_model
 		FROM settings
 	`).Scan(&s.Expose, &s.Survey, &s.Browser, &s.Models, &s.Agent, &s.Tools, &s.WorkingDir, &s.ContextLength,
@@ -1880,7 +1900,7 @@ func (db *database) getSettings() (Settings, error) {
 		&s.LockTimeoutMinutes, &s.AutoDeleteDays, &s.ClipboardClearSeconds,
 		&s.SearchEnabled, &s.RAGCitationsEnabled, &s.RAGPreviewEnabled, &s.ArtifactsEnabled,
 		&s.Theme, &s.KeyboardShortcutsEnabled,
-		&s.NumThread, &s.KeepAlive, &s.MaxLoadedModels, &s.KVCacheType, &s.NumBatch, &s.VulkanEnabled, &s.NumParallel,
+		&s.NumThread, &s.KeepAlive, &s.MaxLoadedModels, &s.KVCacheType, &s.NumBatch, &s.VulkanEnabled, &s.NumParallel, &s.LamazeroEngine, &s.LamazeroKVCache,
 		&s.ResponseMode, &s.SystemPrompt, &s.HumanSubMode, &s.WritingStyleRules, &s.StyleAnalysisModel)
 	if err != nil {
 		return Settings{}, fmt.Errorf("get settings: %w", err)
@@ -1919,7 +1939,7 @@ func (db *database) setSettings(s Settings) error {
 			lock_timeout_minutes = ?, auto_delete_days = ?, clipboard_clear_seconds = ?,
 			search_enabled = ?, rag_citations_enabled = ?, rag_preview_enabled = ?, artifacts_enabled = ?,
 			theme = ?, keyboard_shortcuts_enabled = ?,
-			num_thread = ?, keep_alive = ?, max_loaded_models = ?, kv_cache_type = ?, num_batch = ?, vulkan_enabled = ?, num_parallel = ?,
+			num_thread = ?, keep_alive = ?, max_loaded_models = ?, kv_cache_type = ?, num_batch = ?, vulkan_enabled = ?, num_parallel = ?, lamazero_engine = ?, lamazero_kv_cache = ?,
 			response_mode = ?, system_prompt = ?, human_sub_mode = ?, writing_style_rules = ?, style_analysis_model = ?
 	`, s.Expose, s.Survey, s.Browser, s.Models, s.Agent, s.Tools, s.WorkingDir, s.ContextLength,
 		s.AirplaneMode, s.TurboEnabled, s.WebSearchEnabled, s.SelectedModel, s.SidebarOpen,
@@ -1929,7 +1949,7 @@ func (db *database) setSettings(s Settings) error {
 		s.LockTimeoutMinutes, s.AutoDeleteDays, s.ClipboardClearSeconds,
 		s.SearchEnabled, s.RAGCitationsEnabled, s.RAGPreviewEnabled, s.ArtifactsEnabled,
 		s.Theme, s.KeyboardShortcutsEnabled,
-		s.NumThread, s.KeepAlive, s.MaxLoadedModels, s.KVCacheType, s.NumBatch, s.VulkanEnabled, s.NumParallel,
+		s.NumThread, s.KeepAlive, s.MaxLoadedModels, s.KVCacheType, s.NumBatch, s.VulkanEnabled, s.NumParallel, s.LamazeroEngine, s.LamazeroKVCache,
 		s.ResponseMode, s.SystemPrompt, s.HumanSubMode, s.WritingStyleRules, s.StyleAnalysisModel)
 	if err != nil {
 		return fmt.Errorf("set settings: %w", err)

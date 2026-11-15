@@ -183,6 +183,10 @@ type Settings struct {
 
 	VulkanEnabled bool
 	NumParallel   int
+	// LamazeroEngine selects the CPU engine for lamazero/ models: "auto" (default), "official" or "turbo".
+	LamazeroEngine string
+	// LamazeroKVCache is the KV cache type of the CPU engine: "f16" (default), "turbo3" or "turbo4".
+	LamazeroKVCache string
 
 	ResponseMode string
 	SystemPrompt string

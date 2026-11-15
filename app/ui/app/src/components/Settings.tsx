@@ -702,6 +702,56 @@ export default function Settings() {
             </div>
           </div>
 
+              {/* Moteur CPU lamazero (modèles lamazero/) */}
+              <Field>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start space-x-3">
+                    <GearSix size={20} className="mt-1 flex-shrink-0 text-black dark:text-neutral-100" />
+                    <div>
+                      <Label>Moteur CPU (lamazero)</Label>
+                      <Description>
+                        Moteur des modèles lamazero/. Auto choisit TurboQuant si un cache compressé est demandé.
+                      </Description>
+                    </div>
+                  </div>
+                  <select
+                    data-testid="lamazero-engine"
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+                    value={settings?.LamazeroEngine || "auto"}
+                    onChange={(e) => handlePerfChange("LamazeroEngine", e.target.value)}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="official">llama.cpp officiel</option>
+                    <option value="turbo">TurboQuant (fork AtomicBot)</option>
+                  </select>
+                </div>
+              </Field>
+
+              {/* Cache KV lamazero */}
+              <Field>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start space-x-3">
+                    <GearSix size={20} className="mt-1 flex-shrink-0 text-black dark:text-neutral-100" />
+                    <div>
+                      <Label>Cache KV (lamazero)</Label>
+                      <Description>
+                        turbo3 / turbo4 compressent le cache (TurboQuant) ; nécessite le moteur TurboQuant.
+                      </Description>
+                    </div>
+                  </div>
+                  <select
+                    data-testid="lamazero-kv"
+                    className="rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+                    value={settings?.LamazeroKVCache || "f16"}
+                    onChange={(e) => handlePerfChange("LamazeroKVCache", e.target.value)}
+                  >
+                    <option value="f16">f16 (pleine précision)</option>
+                    <option value="turbo4">turbo4 (compressé 4 bits)</option>
+                    <option value="turbo3">turbo3 (compressé 3 bits)</option>
+                  </select>
+                </div>
+              </Field>
+
           {/* Dromadaire: Encryption at Rest */}
           <div className="overflow-hidden rounded-xl bg-white dark:bg-neutral-800">
             <div className="space-y-4 p-4">
