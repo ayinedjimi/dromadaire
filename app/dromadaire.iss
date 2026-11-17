@@ -33,6 +33,8 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 #ifdef BUNDLE_MODELS
 OutputBaseFilename=DromadaireSetup-Full
+DiskSpanning=yes
+DiskSliceSize=1900000000
 #else
 OutputBaseFilename=DromadaireSetup
 #endif
