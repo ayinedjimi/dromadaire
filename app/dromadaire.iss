@@ -1,8 +1,11 @@
 ; Inno Setup Installer for Dromadaire par INTELLIGENCE PRIVEE
 ; Fork de confidentialite base sur Ollama — aucune telemetrie, aucun cloud
 ;
-; Build:
+; Build (leger, sans modeles) :
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DARCH=amd64 .\dromadaire.iss
+;
+; Build (complet, avec modeles) :
+;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DARCH=amd64 /DBUNDLE_MODELS .\dromadaire.iss
 
 #define MyAppName "Dromadaire"
 #define MyAppVersion "7.9.0"
@@ -28,7 +31,11 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+#ifdef BUNDLE_MODELS
+OutputBaseFilename=DromadaireSetup-Full
+#else
 OutputBaseFilename=DromadaireSetup
+#endif
 SetupIconFile={#MyIcon}
 UninstallDisplayIcon={app}\app.ico
 Compression=lzma2/ultra64
@@ -66,11 +73,13 @@ DialogFontSize=12
 
 [Components]
 Name: "main"; Description: "Application Dromadaire"; Types: full compact custom; Flags: fixed
+#ifdef BUNDLE_MODELS
 Name: "models"; Description: "Modeles IA pre-installes"; Types: full
 Name: "models\embedding"; Description: "Embedding RAG (snowflake-arctic-embed:33m, 65 Mo)"; Types: full
 Name: "models\smollm2"; Description: "SmolLM2 135M (ultra-leger, test rapide, 135 Mo)"; Types: full
 Name: "models\qwen05b_abl"; Description: "Qwen2.5 0.5B abliterated - sans censure (380 Mo)"; Types: full
 Name: "models\qwen15b_abl"; Description: "Qwen2.5 1.5B abliterated - sans censure, meilleure qualite (940 Mo)"; Types: full
+#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "Creer un raccourci sur le Bureau"; GroupDescription: "Raccourcis :"; Flags: checkedonce
@@ -93,6 +102,7 @@ Source: "..\dist\windows-amd64\lib\lamazero\*.dll"; DestDir: "{app}\lib\lamazero
 Source: "..\dist\windows-amd64\vc_redist.x64.exe"; DestDir: "{tmp}"; Check: vc_redist_needed(); Flags: deleteafterinstall
 #endif
 
+#ifdef BUNDLE_MODELS
 ; --- Modeles pre-installes (blobs partages + manifestes par composant) ---
 ; Les blobs sont partages entre modeles (SHA-256) ; on les installe tous,
 ; onlyifdoesntexist evite d'ecraser ceux deja presents.
@@ -123,6 +133,7 @@ Source: "..\dist\bundled-models\manifests\registry.ollama.ai\library\smollm2\*";
 ; Alias lamazero/ (manifestes seuls, blobs partages)
 #if DirExists("..\dist\bundled-models\manifests\registry.ollama.ai\lamazero")
 Source: "..\dist\bundled-models\manifests\registry.ollama.ai\lamazero\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\registry.ollama.ai\lamazero\"; Components: models; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+#endif
 #endif
 
 ; Icone

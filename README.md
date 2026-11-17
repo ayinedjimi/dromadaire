@@ -105,8 +105,13 @@ L'installeur propose des modeles prets a l'emploi (selectionnables a l'installat
 
 Telechargez le dernier installeur depuis la [page Releases](https://github.com/ayinedjimi/dromadaire/releases/latest) :
 
-1. Telechargez `DromadaireSetup.exe`
-2. Lancez l'installeur (aucun droit administrateur requis)
+| Fichier | Taille | Contenu |
+|---------|--------|---------|
+| `DromadaireSetup.exe` | ~100 Mo | Application seule (modeles a telecharger) |
+| `DromadaireSetup-Full.exe` | ~1,8 Go | Application + modeles pre-installes |
+
+1. Telechargez l'installeur de votre choix
+2. Lancez-le (aucun droit administrateur requis)
 3. Dromadaire s'installe dans `%LOCALAPPDATA%\Programs\Dromadaire`
 
 ### Mode portable
