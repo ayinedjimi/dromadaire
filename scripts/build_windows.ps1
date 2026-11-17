@@ -509,6 +509,122 @@ function vulkan {
     }
 }
 
+function lamazeroDlls {
+    Write-Output "Copying lamazero DLLs into dist"
+    $destDir = "${script:DIST_DIR}\lib\lamazero"
+    mkdir -Force -path $destDir | Out-Null
+
+    # Official engine
+    $officialSrc = $env:LAMAZERO_DLL_OFFICIAL
+    if (-not $officialSrc) { $officialSrc = "D:\lamazero\dist\lamazero.dll" }
+    if (Test-Path $officialSrc) {
+        Copy-Item -Force $officialSrc "$destDir\lamazero.dll"
+        Write-Output "  lamazero.dll copied from $officialSrc"
+    } else {
+        Write-Error "lamazero official DLL not found at $officialSrc - set LAMAZERO_DLL_OFFICIAL"
+        exit 1
+    }
+
+    # TurboQuant engine
+    $turboSrc = $env:LAMAZERO_DLL_TURBO
+    if (-not $turboSrc) { $turboSrc = "D:\lamazero\build-turbo\bin\Release\lamazero.dll" }
+    if (Test-Path $turboSrc) {
+        Copy-Item -Force $turboSrc "$destDir\lamazero-turbo.dll"
+        Write-Output "  lamazero-turbo.dll copied from $turboSrc"
+    } else {
+        Write-Error "lamazero TurboQuant DLL not found at $turboSrc - set LAMAZERO_DLL_TURBO"
+        exit 1
+    }
+}
+
+function bundleModels {
+    Write-Output "Bundling models for installer"
+    $bundleDir = "${script:SRC_DIR}\dist\bundled-models"
+    $ollamaExe = "${script:DIST_DIR}\ollama.exe"
+
+    if (-not (Test-Path $ollamaExe)) {
+        Write-Error "ollama.exe not found at $ollamaExe - build it first (run the 'ollama' step)"
+        exit 1
+    }
+
+    # Models to bundle: name → pull tag
+    # Default list; override with DROMADAIRE_BUNDLE_MODELS (comma-separated pull names)
+    if ($env:DROMADAIRE_BUNDLE_MODELS) {
+        $models = $env:DROMADAIRE_BUNDLE_MODELS -split ','
+    } else {
+        $models = @(
+            "snowflake-arctic-embed:33m",
+            "smollm2:135m",
+            "hf.co/mradermacher/Qwen2.5-0.5B-Instruct-abliterated-GGUF:Q4_K_M",
+            "hf.co/mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF:Q4_K_M"
+        )
+    }
+
+    # Start a temporary ollama server with an isolated model store
+    $bundlePort = "11399"
+    $env:OLLAMA_HOST = "127.0.0.1:$bundlePort"
+    $env:OLLAMA_MODELS = $bundleDir
+
+    Write-Output "  Starting temporary ollama server on port $bundlePort"
+    $proc = Start-Process -FilePath $ollamaExe -ArgumentList "serve" -PassThru -WindowStyle Hidden
+
+    # Wait for server to be ready (up to 30 seconds)
+    $ready = $false
+    for ($wait = 0; $wait -lt 30; $wait++) {
+        Start-Sleep -Seconds 1
+        try {
+            $null = Invoke-WebRequest -Uri "http://127.0.0.1:$bundlePort/" -TimeoutSec 2 -ErrorAction Stop
+            $ready = $true
+            break
+        } catch {}
+    }
+    if (-not $ready) {
+        Write-Error "Temporary ollama server did not start within 30 seconds"
+        try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop } catch {}
+        exit 1
+    }
+
+    try {
+        foreach ($m in $models) {
+            $m = $m.Trim()
+            if (-not $m) { continue }
+            Write-Output "  Pulling $m ..."
+            & $ollamaExe pull $m
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to pull $m (exit code $LASTEXITCODE)"
+                exit $LASTEXITCODE
+            }
+        }
+
+        # Create lamazero/ aliases for chat models.
+        # HuggingFace names need explicit short aliases since
+        # "lamazero/hf.co/..." is an invalid Ollama name.
+        $aliases = @{
+            "smollm2:135m" = "lamazero/smollm2:135m"
+            "hf.co/mradermacher/Qwen2.5-0.5B-Instruct-abliterated-GGUF:Q4_K_M" = "lamazero/qwen2.5-0.5b-abliterated"
+            "hf.co/mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF:Q4_K_M" = "lamazero/qwen2.5-1.5b-abliterated"
+        }
+        foreach ($src in $aliases.Keys) {
+            $dst = $aliases[$src]
+            Write-Output "  Creating alias $dst -> $src"
+            & $ollamaExe cp $src $dst
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to create alias $dst from $src"
+                exit 1
+            }
+        }
+    } finally {
+        Write-Output "  Stopping temporary ollama server"
+        try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop } catch {}
+        Start-Sleep -Seconds 1
+        Remove-Item Env:OLLAMA_HOST -ErrorAction SilentlyContinue
+        Remove-Item Env:OLLAMA_MODELS -ErrorAction SilentlyContinue
+    }
+
+    $blobSize = (Get-ChildItem "$bundleDir\blobs" -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+    Write-Output "  Bundled models total: $([math]::Round($blobSize/1MB, 1)) MB"
+}
+
 function mlxCuda13 {
     mkdir -Force -path "${script:DIST_DIR}\" | Out-Null
     $cudaMajorVer="13"
@@ -695,7 +811,7 @@ function buildApp {
     param (
         [string]$arch
     )
-	& go build -trimpath -ldflags "-s -w -H windowsgui -X=github.com/ollama/ollama/app/version.Version=$script:VERSION" -o .\dist\windows-ollama-app-${arch}.exe ./app/cmd/app/
+	& go build -trimpath -ldflags "-s -w -H windowsgui -X=github.com/ollama/ollama/app/version.Version=$script:VERSION" -o .\dist\dromadaire.exe ./app/cmd/app/
     if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
 }
 
@@ -755,9 +871,9 @@ function installer {
     cd "${script:SRC_DIR}\app"
     $env:PKG_VERSION=$script:PKG_VERSION
     if ("${env:KEY_CONTAINER}") {
-        & "${script:INNO_SETUP_DIR}\ISCC.exe" /DARCH=$script:TARGET_ARCH /SMySignTool="${script:SignTool} sign /fd sha256 /t http://timestamp.digicert.com /f ${script:OLLAMA_CERT} /csp `$qGoogle Cloud KMS Provider`$q /kc ${env:KEY_CONTAINER} `$f" .\ollama.iss
+        & "${script:INNO_SETUP_DIR}\ISCC.exe" /DARCH=$script:TARGET_ARCH /SMySignTool="${script:SignTool} sign /fd sha256 /t http://timestamp.digicert.com /f ${script:OLLAMA_CERT} /csp `$qGoogle Cloud KMS Provider`$q /kc ${env:KEY_CONTAINER} `$f" .\dromadaire.iss
     } else {
-        & "${script:INNO_SETUP_DIR}\ISCC.exe" /DARCH=$script:TARGET_ARCH .\ollama.iss
+        & "${script:INNO_SETUP_DIR}\ISCC.exe" /DARCH=$script:TARGET_ARCH .\dromadaire.iss
     }
     if ($LASTEXITCODE -ne 0) { exit($LASTEXITCODE)}
 }
@@ -968,6 +1084,8 @@ try {
         vulkan
         mlxCuda13
         ollama
+        lamazeroDlls
+        bundleModels
         app
         cpuArm64
         ollamaArm64

@@ -86,12 +86,16 @@ Developpe par [AYI NEDJIMI Consultants](https://ayinedjimi-consultants.fr), spec
 
 ### Modeles pre-installes
 
-L'installeur inclut deux modeles prets a l'emploi :
+L'installeur propose des modeles prets a l'emploi (selectionnables a l'installation) :
 
 | Modele | Taille | Usage |
 |--------|--------|-------|
-| `tinyllama` | 608 Mo | Chat rapide, ideal pour tester |
-| `snowflake-arctic-embed:33m` | 64 Mo | Embedding pour le RAG |
+| `snowflake-arctic-embed:33m` | 65 Mo | Embedding pour le RAG |
+| `smollm2:135m` | 135 Mo | Ultra-leger, test instantane |
+| Qwen2.5 0.5B **abliterated** | 380 Mo | Chat sans censure (Apache 2.0) |
+| Qwen2.5 1.5B **abliterated** | 940 Mo | Chat sans censure, meilleure qualite |
+
+> Les modeles abliterated sont des versions dont les filtres de refus ont ete retires. Ils repondent a toutes les questions sans restriction. Tous les modeles ci-dessus sont sous licence Apache 2.0.
 
 ---
 
@@ -184,7 +188,7 @@ dromadaire/
 | Backend | Go 1.24+, llama.cpp (C/C++) |
 | Frontend | React 19, TypeScript, Vite 6, TailwindCSS |
 | Editeur | Monaco Editor |
-| Database | SQLite (schema v26) |
+| Database | SQLite (schema v32) |
 | Embedding | snowflake-arctic-embed:33m |
 | Chiffrement | AES-256-GCM (Go crypto/aes) |
 | Runtime | llama.cpp CPU (AVX2/Haswell) + Vulkan optionnel |

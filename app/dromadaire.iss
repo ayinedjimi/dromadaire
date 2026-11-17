@@ -64,6 +64,14 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 [LangOptions]
 DialogFontSize=12
 
+[Components]
+Name: "main"; Description: "Application Dromadaire"; Types: full compact custom; Flags: fixed
+Name: "models"; Description: "Modeles IA pre-installes"; Types: full
+Name: "models\embedding"; Description: "Embedding RAG (snowflake-arctic-embed:33m, 65 Mo)"; Types: full
+Name: "models\smollm2"; Description: "SmolLM2 135M (ultra-leger, test rapide, 135 Mo)"; Types: full
+Name: "models\qwen05b_abl"; Description: "Qwen2.5 0.5B abliterated - sans censure (380 Mo)"; Types: full
+Name: "models\qwen15b_abl"; Description: "Qwen2.5 1.5B abliterated - sans censure, meilleure qualite (940 Mo)"; Types: full
+
 [Tasks]
 Name: "desktopicon"; Description: "Creer un raccourci sur le Bureau"; GroupDescription: "Raccourcis :"; Flags: checkedonce
 
@@ -85,11 +93,36 @@ Source: "..\dist\windows-amd64\lib\lamazero\*.dll"; DestDir: "{app}\lib\lamazero
 Source: "..\dist\windows-amd64\vc_redist.x64.exe"; DestDir: "{tmp}"; Check: vc_redist_needed(); Flags: deleteafterinstall
 #endif
 
-; Modele d'embedding pre-bundle (snowflake-arctic-embed:33m, ~65 Mo)
-; onlyifdoesntexist evite d'ecraser si le modele est deja present
-#if DirExists("..\dist\bundled-models\manifests")
-Source: "..\dist\bundled-models\manifests\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\"; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
-Source: "..\dist\bundled-models\blobs\*"; DestDir: "{%USERPROFILE}\.ollama\models\blobs\"; Flags: ignoreversion onlyifdoesntexist
+; --- Modeles pre-installes (blobs partages + manifestes par composant) ---
+; Les blobs sont partages entre modeles (SHA-256) ; on les installe tous,
+; onlyifdoesntexist evite d'ecraser ceux deja presents.
+#if DirExists("..\dist\bundled-models\blobs")
+Source: "..\dist\bundled-models\blobs\*"; DestDir: "{%USERPROFILE}\.ollama\models\blobs\"; Components: models; Flags: ignoreversion onlyifdoesntexist
+#endif
+
+; snowflake-arctic-embed:33m (embedding RAG)
+#if DirExists("..\dist\bundled-models\manifests\registry.ollama.ai\library\snowflake-arctic-embed")
+Source: "..\dist\bundled-models\manifests\registry.ollama.ai\library\snowflake-arctic-embed\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\registry.ollama.ai\library\snowflake-arctic-embed\"; Components: models\embedding; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+#endif
+
+; qwen2.5-0.5b abliterated (HuggingFace) - manifestes sous hf.co/
+#if DirExists("..\dist\bundled-models\manifests\hf.co\mradermacher\Qwen2.5-0.5B-Instruct-abliterated-GGUF")
+Source: "..\dist\bundled-models\manifests\hf.co\mradermacher\Qwen2.5-0.5B-Instruct-abliterated-GGUF\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\hf.co\mradermacher\Qwen2.5-0.5B-Instruct-abliterated-GGUF\"; Components: models\qwen05b_abl; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+#endif
+
+; qwen2.5-1.5b abliterated (HuggingFace)
+#if DirExists("..\dist\bundled-models\manifests\hf.co\mradermacher\Qwen2.5-1.5B-Instruct-abliterated-GGUF")
+Source: "..\dist\bundled-models\manifests\hf.co\mradermacher\Qwen2.5-1.5B-Instruct-abliterated-GGUF\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\hf.co\mradermacher\Qwen2.5-1.5B-Instruct-abliterated-GGUF\"; Components: models\qwen15b_abl; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+#endif
+
+; smollm2:135m
+#if DirExists("..\dist\bundled-models\manifests\registry.ollama.ai\library\smollm2")
+Source: "..\dist\bundled-models\manifests\registry.ollama.ai\library\smollm2\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\registry.ollama.ai\library\smollm2\"; Components: models\smollm2; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
+#endif
+
+; Alias lamazero/ (manifestes seuls, blobs partages)
+#if DirExists("..\dist\bundled-models\manifests\registry.ollama.ai\lamazero")
+Source: "..\dist\bundled-models\manifests\registry.ollama.ai\lamazero\*"; DestDir: "{%USERPROFILE}\.ollama\models\manifests\registry.ollama.ai\lamazero\"; Components: models; Flags: ignoreversion recursesubdirs createallsubdirs onlyifdoesntexist
 #endif
 
 ; Icone

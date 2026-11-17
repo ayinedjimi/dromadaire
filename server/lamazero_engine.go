@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -44,31 +45,69 @@ func isLamazeroName(n model.Name) bool {
 
 // lamazeroState keeps one loaded model. Requests are serialized because a
 // session runs one generation at a time.
+//
+// reqLo stores the options as requested by the caller. effectiveLo stores
+// the options actually used (which may differ after a turbo->official fallback).
+// Reuse is decided by comparing reqLo so that a repeated request with the same
+// caller options does not trigger a redundant reload.
 var lamazeroState struct {
-	mu   sync.Mutex
-	path string
-	lo   lamazero.LoadOptions
-	sess *lamazero.Session
-	idle *time.Timer
+	mu          sync.Mutex
+	path        string
+	reqLo       lamazero.LoadOptions
+	effectiveLo lamazero.LoadOptions
+	sess        *lamazero.Session
+	idle        *time.Timer
 }
+
+// lamazeroLoadFunc is the function used to load a model. Tests replace it
+// with a fake to simulate engine failures without real DLLs.
+var lamazeroLoadFunc = lamazero.Load
 
 // lamazeroSession returns a session for path/lo, reloading when either
 // changes. The caller must hold lamazeroState.mu.
+//
+// When the engine setting is "auto" and the selected engine fails to load
+// (e.g. TurboQuant does not support the model's architecture), the function
+// falls back to the official engine with an F16 KV cache. An explicit
+// "turbo" setting does not fall back - the error is returned as-is.
+//
+// Reuse is decided by comparing the requested options (reqLo), not the
+// effective ones, so that a turbo->official fallback does not trigger a
+// reload on the next identical request.
 func lamazeroSession(path string, lo lamazero.LoadOptions) (*lamazero.Session, error) {
 	st := &lamazeroState
-	if st.sess != nil && st.path == path && st.lo == lo {
+	if st.sess != nil && st.path == path && st.reqLo == lo {
 		return st.sess, nil
 	}
 	if st.sess != nil {
 		st.sess.Close()
 		st.sess = nil
 	}
-	sess, err := lamazero.Load(path, lo)
+	effective := lo
+	sess, err := lamazeroLoadFunc(path, effective)
+	if err != nil && effective.Engine == lamazero.EngineTurbo && isAutoEngine() {
+		slog.Warn("lamazero: turbo engine failed, falling back to official with F16 cache",
+			"path", path, "error", err)
+		effective.Engine = lamazero.EngineOfficial
+		effective.KVTypeK = -1
+		effective.KVTypeV = -1
+		sess, err = lamazeroLoadFunc(path, effective)
+	}
 	if err != nil {
 		return nil, err
 	}
-	st.sess, st.path, st.lo = sess, path, lo
+	st.sess = sess
+	st.path = path
+	st.reqLo = lo
+	st.effectiveLo = effective
 	return sess, nil
+}
+
+// isAutoEngine returns true when the engine setting is "auto" or unset
+// (meaning the system chose the engine automatically, so a fallback is acceptable).
+func isAutoEngine() bool {
+	engine := strings.ToLower(strings.TrimSpace(os.Getenv("DROMADAIRE_LAMAZERO_ENGINE")))
+	return engine == "" || engine == "auto"
 }
 
 // lamazeroTouchIdle (re)arms the idle unload timer. Caller holds the mutex.
@@ -89,6 +128,8 @@ func lamazeroUnload() {
 		lamazeroState.sess.Close()
 		lamazeroState.sess = nil
 		lamazeroState.path = ""
+		lamazeroState.reqLo = lamazero.LoadOptions{}
+		lamazeroState.effectiveLo = lamazero.LoadOptions{}
 	}
 }
 

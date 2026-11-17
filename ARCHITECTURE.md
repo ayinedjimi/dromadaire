@@ -275,7 +275,23 @@ Le plan complet, avec les identifiants de test (`data-testid`) et la couverture 
 
 - `scripts/build_windows.ps1` : compile `ollama.exe` (moteur), `dromadaire.exe` (application), et prépare `dist\windows-amd64\`. Il gère les backends CUDA, ROCm et Vulkan.
 - `app/dromadaire.iss` : script Inno Setup. Il produit `DromadaireSetup.exe`, qui embarque `ollama.exe`, `lib\ollama\*`, `lib\lamazero\*.dll` et le redistribuable VC++ si nécessaire.
-- Les DLL lamazero sont à reconstruire et à copier dans `dist` avant de lancer l'installeur (voir 6.5).
+- Les DLL lamazero sont copiées automatiquement par l'étape `lamazeroDlls` (voir 6.5).
+- Les modèles sont empaquetés par l'étape `bundleModels`.
+
+### 8.1 Modèles embarqués dans l'installeur
+
+L'installeur propose des **composants optionnels** pour les modèles pré-installés. L'utilisateur choisit lesquels installer :
+
+| Modèle | Taille | Licence | Type |
+|---|---|---|---|
+| `snowflake-arctic-embed:33m` | 65 Mo | Apache 2.0 | Embedding (RAG) |
+| `smollm2:135m` | 135 Mo | Apache 2.0 | Ultra-léger, test rapide |
+| `hf.co/mradermacher/Qwen2.5-0.5B-Instruct-abliterated-GGUF:Q4_K_M` | 380 Mo | Apache 2.0 | Chat sans censure |
+| `hf.co/mradermacher/Qwen2.5-1.5B-Instruct-abliterated-GGUF:Q4_K_M` | 940 Mo | Apache 2.0 | Chat sans censure, meilleure qualité |
+
+Les modèles de chat reçoivent automatiquement un alias `lamazero/` lors du build (`ollama cp`), pour être utilisables sur les deux moteurs (GPU et CPU). Les blobs (poids) sont dédupliqués par SHA-256 : un blob partagé entre plusieurs modèles n'est stocké qu'une seule fois.
+
+L'étape `bundleModels` du script de build lance un serveur Ollama temporaire, tire les modèles dans `dist\bundled-models`, et crée les alias. La liste peut être personnalisée via `DROMADAIRE_BUNDLE_MODELS` (noms séparés par des virgules).
 
 ---
 
@@ -284,6 +300,6 @@ Le plan complet, avec les identifiants de test (`data-testid`) et la couverture 
 - **Une seule session lamazero** à la fois : charger un autre modèle `lamazero/` décharge le précédent.
 - **Pas d'images, pas d'appels d'outils natifs, pas de thinking natif** sur le moteur CPU.
 - **Réglage du moteur par variable d'environnement** : le changement n'est appliqué qu'après redémarrage du moteur. La bannière de redémarrage ne surveille que les réglages lamazero, pas encore les réglages GPU (`Cache KV`, taille de batch).
-- **Le fork TurboQuant ne connaît pas les architectures récentes** (ex. `lfm3`). Le choix du moteur doit tenir compte de l'architecture du modèle.
+- **Le fork TurboQuant ne connaît pas les architectures récentes** (ex. `lfm3`). **Atténué** : en mode `auto`, si le moteur TurboQuant échoue au chargement, le système bascule automatiquement sur le moteur officiel avec un cache F16 (avec un warning dans les logs). En mode `turbo` explicite, l'erreur est renvoyée telle quelle.
 - **Compatibilité du backend CUDA** : les backends `cuda_v13` / `cuda_v12` viennent d'une autre version d'Ollama que `ggml.dll` de Dromadaire. Non vérifié sur GPU.
-- **Build non automatisé** pour les DLL lamazero (voir 6.5).
+- ~~Build non automatisé pour les DLL lamazero~~ **Corrigé** : `scripts/build_windows.ps1` inclut désormais les étapes `lamazeroDlls` (copie des DLL) et `bundleModels` (téléchargement et empaquetage des modèles). Variables d'environnement : `LAMAZERO_DLL_OFFICIAL`, `LAMAZERO_DLL_TURBO`, `DROMADAIRE_BUNDLE_MODELS`.
